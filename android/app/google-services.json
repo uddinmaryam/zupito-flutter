@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "205791278716",
+    "project_id": "zupito-f2fbb",
+    "storage_bucket": "zupito-f2fbb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:205791278716:android:9c1e49feb019f97a607bf9",
+        "android_client_info": {
+          "package_name": "com.example.zupito"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC2zRxZjRAI0ytwjCfXPGWLpzlVxnZvtFc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
