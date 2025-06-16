@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-import 'package:zupito/screens/protected_data_screen.dart';
 import '../services/auth_service.dart';
 import '../services/secure_storage_services.dart';
 import 'signup_screen.dart';
+import 'map_screen.dart'; // ✅ Replace with your real next screen
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -66,9 +66,12 @@ class _LoginScreenState extends State<LoginScreen>
 
       await _secureStorage.saveToken(token);
 
+      // ✅ Navigate to your actual next screen (map/dashboard)
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const ProtectedDataScreen()),
+        MaterialPageRoute(
+          builder: (_) => const MapScreen(),
+        ), // <- Update here if needed
       );
     } else {
       print("Login failed: Token is null");
@@ -87,9 +90,9 @@ class _LoginScreenState extends State<LoginScreen>
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         print('✅ Connected to backend: ${data['message']}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ ${data['message']}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('✅ ${data['message']}')));
       } else {
         print('❌ Failed with status code: ${response.statusCode}');
         ScaffoldMessenger.of(context).showSnackBar(
@@ -98,9 +101,9 @@ class _LoginScreenState extends State<LoginScreen>
       }
     } catch (e) {
       print('❌ Error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Connection error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('❌ Connection error: $e')));
     }
   }
 
@@ -156,7 +159,10 @@ class _LoginScreenState extends State<LoginScreen>
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text('Login', style: TextStyle(fontSize: 16)),
+                      child: const Text(
+                        'Login',
+                        style: TextStyle(fontSize: 16),
+                      ),
                     ),
                   ),
 
@@ -178,12 +184,14 @@ class _LoginScreenState extends State<LoginScreen>
                     ),
                   ),
 
-                  /// 👇 Backend test button
                   ElevatedButton(
                     onPressed: testBackendConnection,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.deepOrange,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 10,
+                      ),
                     ),
                     child: const Text("Test Backend Connection"),
                   ),

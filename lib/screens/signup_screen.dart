@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:zupito/screens/protected_data_screen.dart';
 import '../services/auth_service.dart';
-import '../services/secure_storage_services.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -17,7 +15,6 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _phoneController = TextEditingController();
 
   final AuthService authService = AuthService();
-  final SecureStorageService _secureStorage = SecureStorageService();
 
   bool _isLoading = false;
 
@@ -47,17 +44,12 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final token = await authService.signup(username, email, password, phone);
+      final success = await authService.signup(username, email, password, phone);
 
-      if (token != null) {
-        print('Signup successful, token: $token');
-        await _secureStorage.saveToken(token);
-
+      if (success) {
+        _showSnackBar('Signup successful! Please login.');
         if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const ProtectedDataScreen()),
-        );
+        Navigator.pop(context); // Go back to Login screen
       } else {
         _showSnackBar('Signup failed. Check credentials or try again.');
       }
@@ -69,9 +61,7 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override

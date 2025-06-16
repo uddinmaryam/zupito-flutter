@@ -1,13 +1,15 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:zupito/api/api_config.dart'; // backendUrl imported here
+import 'package:zupito/api/api_config.dart'; // Make sure backendUrl is defined here
 import 'package:zupito/services/secure_storage_services.dart';
 
 class AuthService {
-  static const String baseUrl = '$backendUrl/api/auth';
+  // ✅ Correct baseUrl using the real device-compatible local IP address
+  static const String baseUrl = '$backendUrl/api/v1/auth';
 
   final SecureStorageService _secureStorage = SecureStorageService();
 
+  // 🔐 Login
   Future<String?> login(String username, String password) async {
     final url = Uri.parse('$baseUrl/login');
 
@@ -20,18 +22,28 @@ class AuthService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['token'];
+        print("✅ Login successful. Response data: $data");
+
+        if (data['token'] != null) {
+          await _secureStorage.saveToken(data['token']);
+          return data['token'];
+        } else {
+          print("❌ Token is missing in response.");
+          return null;
+        }
       } else {
-        print('Login failed: ${response.body}');
+        print("❌ Login failed with status ${response.statusCode}");
+        print("❌ Response body: ${response.body}");
         return null;
       }
     } catch (e) {
-      print('Error during login: $e');
+      print('❌ Error during login: $e');
       return null;
     }
   }
 
-  Future<String?> signup(
+  // 📝 Signup (updated: no auto-login)
+  Future<bool> signup(
     String username,
     String email,
     String password,
@@ -52,38 +64,16 @@ class AuthService {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // Signup success, now try login to get token
-        print('Signup successful, now logging in...');
-        return await login(username, password);
+        print('✅ Signup successful');
+        return true;  // Return true to indicate success
       } else {
-        print('Signup failed: ${response.body}');
-        return null;
+        print('❌ Signup failed with status ${response.statusCode}');
+        print('❌ Response body: ${response.body}');
+        return false;
       }
     } catch (e) {
-      print('Error during signup: $e');
-      return null;
-    }
-  }
-
-  Future<http.Response?> getProtectedData() async {
-    final token = await _secureStorage.getToken();
-
-    if (token == null) {
-      print('No token found, user might not be logged in');
-      return null;
-    }
-
-    final url = Uri.parse('$backendUrl/api/protected-route');
-
-    try {
-      final response = await http.get(
-        url,
-        headers: {'Authorization': 'Bearer $token'},
-      );
-      return response;
-    } catch (e) {
-      print('Error fetching protected data: $e');
-      return null;
+      print('❌ Error during signup: $e');
+      return false;
     }
   }
 }

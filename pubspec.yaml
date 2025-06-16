@@ -15,10 +15,11 @@ dependencies:
   google_sign_in: ^6.1.6
   firebase_auth: ^4.17.8
   firebase_core: ^2.27.0
-  flutter_map: ^4.0.0
-  latlong2: ^0.8.1
-  http: ^0.13.0
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.0
+  http: ^1.2.1
   flutter_secure_storage: ^8.0.0
+  geolocator: ^9.0.2
 
   location: ^5.0.0
   qr_code_scanner:
@@ -46,3 +47,4 @@ flutter:
     - assets/images/logo.jpeg
     - assets/images/profileicon.jpg
     - assets/images/bike_icon.avif
+    - assets/images/user_location.png
