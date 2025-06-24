@@ -408,7 +408,7 @@ class _MapScreenState extends State<MapScreen> {
               ElevatedButton(
                 onPressed: () async {
                   final url = Uri.parse(
-                    'http://172.16.31.132:8000/api/v1/bikes/code/${bike.code}/otp',
+                    'https://backend-bicycle.onrender.com/api/v1/bikes/code/${bike.code}/otp',
                   );
                   try {
                     final response = await http.get(url);

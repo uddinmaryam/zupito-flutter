@@ -1,1 +1,1 @@
-const String backendUrl = 'http://172.16.31.132:8000';
+const String backendUrl = 'https://backend-bicycle-1.onrender.com';
