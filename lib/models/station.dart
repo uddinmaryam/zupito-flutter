@@ -30,11 +30,16 @@ class Station {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    '_id': id,
-    'name': name,
-    'description': description,
-    'location': {'lat': lat, 'lng': lng},
-    'bikes': bikes.map((bike) => bike.toJson()).toList(),
-  };
+  Map<String, dynamic> toJson() {
+    return {
+      '_id': id,
+      'name': name,
+      'description': description,
+      'location': {
+        'lat': lat,
+        'lng': lng,
+      },
+      'bikes': bikes.map((bike) => bike.toJson()).toList(),
+    };
+  }
 }

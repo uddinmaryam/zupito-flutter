@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:zupito/screens/map/map_screen.dart';
 import 'dart:convert';
 
 import '../services/auth_service.dart';
 import '../services/secure_storage_services.dart';
 import 'signup_screen.dart';
-import 'map_screen.dart'; // ✅ Replace with your real next screen
+// ✅ Replace with your real next screen
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});

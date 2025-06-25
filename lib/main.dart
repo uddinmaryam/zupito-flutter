@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:zupito/screens/map/map_screen.dart';
 import 'firebase_options.dart';
 
 import 'package:zupito/screens/login_screen.dart';
-import 'package:zupito/screens/map_screen.dart';
+
 import 'package:zupito/screens/splash_screen.dart';
 import 'package:zupito/screens/phone_number_screen.dart';
-import 'package:zupito/screens/otp_verification_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    // ✅ Initialize only once
+    // ✅ Initialize Firebase
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
@@ -37,7 +37,6 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const MapScreen(),
         '/phone': (context) => const PhoneNumberScreen(),
-        '/otp': (context) => const OtpVerificationScreen(),
       },
     );
   }
