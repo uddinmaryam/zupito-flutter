@@ -6,13 +6,10 @@ import 'package:location/location.dart';
 import '../../models/station.dart';
 import '../../models/user.dart';
 import '../../../services/ride_service.dart';
-import '../../../services/station_service.dart';
 
 import 'widgets/station_marker.dart';
 import 'widgets/station_bottom_sheet.dart';
 import 'widgets/user_profile_modal.dart';
-import '../../../services/ride_service.dart';
-
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -28,7 +25,7 @@ class _MapScreenState extends State<MapScreen> {
   Marker? _currentLocationMarker;
   List<LatLng> pathPoints = [];
 
-  final List<Station> _stations = []; // Load from backend or static file
+  final List<Station> _stations = []; // Load from backend or static
   final UserProfile _userProfile = UserProfile();
 
   @override
@@ -99,11 +96,17 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFE8F0FE),
       appBar: AppBar(
-        title: const Text("Bike Stations Map"),
+        backgroundColor: const Color(0xFFE8F0FE),
+        elevation: 0,
+        title: const Text(
+          "Explore Zupito Rides",
+          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.account_circle),
+            icon: const Icon(Icons.account_circle, color: Colors.black87),
             onPressed: _showUserProfile,
           ),
         ],
@@ -142,8 +145,9 @@ class _MapScreenState extends State<MapScreen> {
               ],
             ),
       floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.indigo,
         onPressed: _initLocation,
-        child: const Icon(Icons.my_location),
+        child: const Icon(Icons.my_location, color: Colors.white),
       ),
     );
   }

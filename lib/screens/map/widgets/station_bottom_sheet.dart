@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:zupito/models/bike.dart';
 import '../../../models/station.dart';
 import '../../../models/user.dart';
-import '../../../services/ride_service.dart';
 
 void showStationBottomSheet(BuildContext context, Station station, UserProfile userProfile) {
   final availableBikes = station.bikes.where((b) => b.isAvailable).toList();

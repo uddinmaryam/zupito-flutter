@@ -3,6 +3,7 @@ import 'dart:async';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
+
   @override
   _SplashScreenState createState() => _SplashScreenState();
 }
@@ -18,14 +19,13 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller = AnimationController(
       vsync: this,
-      duration: Duration(seconds: 2),
+      duration: const Duration(seconds: 3),
     );
 
     _animation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
-
     _controller.forward();
 
-    Timer(Duration(seconds: 2), () {
+    Timer(const Duration(seconds: 2), () {
       Navigator.pushReplacementNamed(context, '/login');
     });
   }
@@ -39,15 +39,17 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.indigo, // 👈 Indigo background
       body: FadeTransition(
         opacity: _animation,
-        child: Container(
-          decoration: BoxDecoration(
-            image: DecorationImage(
-              image: AssetImage('assets/images/splash.jpeg'),
-              fit: BoxFit.contain,
-              alignment:
-                  Alignment.center, // This makes image cover whole screen
+        child: const Center(
+          child: Text(
+            'Zupito',
+            style: TextStyle(
+              fontSize: 42,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: 2,
             ),
           ),
         ),

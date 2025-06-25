@@ -43,7 +43,7 @@ flutter_native_splash:
 flutter:
   uses-material-design: true
   assets:
-    - assets/images/splash.jpeg
-    - assets/images/logo.jpeg
+    - assets/images/splash.png
+
     - assets/images/profileicon.jpg
     - assets/images/bike_icon.avif
