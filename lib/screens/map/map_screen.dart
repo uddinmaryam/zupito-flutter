@@ -28,6 +28,35 @@ class _MapScreenState extends State<MapScreen> {
   final List<Station> _stations = []; // Load from backend or static
   final UserProfile _userProfile = UserProfile();
 
+  final List<LatLng> _lalitpurBoundary = [
+    LatLng(27.6912, 85.3127),
+    LatLng(27.6815, 85.3293),
+    LatLng(27.6677, 85.3324),
+    LatLng(27.6545, 85.3178),
+    LatLng(27.6619, 85.2952),
+    LatLng(27.6804, 85.2918),
+    LatLng(27.6901, 85.2991),
+  ];
+
+  bool isInsideLalitpur(LatLng point) {
+    int i = 0, j = _lalitpurBoundary.length - 1;
+    bool inside = false;
+    for (; i < _lalitpurBoundary.length; j = i++) {
+      if (((_lalitpurBoundary[i].latitude > point.latitude) !=
+              (_lalitpurBoundary[j].latitude > point.latitude)) &&
+          (point.longitude <
+              (_lalitpurBoundary[j].longitude -
+                          _lalitpurBoundary[i].longitude) *
+                      (point.latitude - _lalitpurBoundary[i].latitude) /
+                      (_lalitpurBoundary[j].latitude -
+                          _lalitpurBoundary[i].latitude) +
+                  _lalitpurBoundary[i].longitude)) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -74,6 +103,18 @@ class _MapScreenState extends State<MapScreen> {
             child: const Icon(Icons.my_location, color: Colors.blue, size: 40),
           );
         });
+
+        bool inside = isInsideLalitpur(updatedLocation);
+        if (!inside) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('⚠️ You are outside the allowed area!'),
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+          }
+        }
       }
     });
   }
@@ -122,11 +163,21 @@ class _MapScreenState extends State<MapScreen> {
                       'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                   subdomains: ['a', 'b', 'c'],
                 ),
+                PolygonLayer(
+                  polygons: [
+                    Polygon(
+                      points: _lalitpurBoundary,
+                      color: Colors.green.withOpacity(0.2),
+                      borderStrokeWidth: 3.0,
+                      borderColor: Colors.green,
+                    ),
+                  ],
+                ),
                 PolylineLayer(
                   polylines: [
                     Polyline(
                       points: pathPoints,
-                      color: Colors.blue,
+                      color: Colors.red,
                       strokeWidth: 4.0,
                     ),
                   ],
