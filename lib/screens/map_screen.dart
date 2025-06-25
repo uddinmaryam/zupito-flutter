@@ -1,7 +1,8 @@
-// Complete MapScreen with full station info, OTP unlock, eSewa simulation, and fare by minutes
+// Complete MapScreen with backend-based unlock, route drawing, and real fare calculation
 
 import 'dart:convert';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
@@ -60,12 +61,6 @@ class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
   Marker? _currentLocationMarker;
 
-  final Map<String, LatLng> stationCoordinates = {
-    'sanepa': LatLng(27.685353, 85.307080),
-    'pulchowk': LatLng(27.679600, 85.319458),
-    'jawalakhel': LatLng(27.673389, 85.312648),
-  };
-
   final List<Station> _stations = [
     Station(
       name: 'Sanepa',
@@ -114,11 +109,13 @@ class _MapScreenState extends State<MapScreen> {
       serviceEnabled = await _location.requestService();
       if (!serviceEnabled) return;
     }
+
     PermissionStatus permissionGranted = await _location.hasPermission();
     if (permissionGranted == PermissionStatus.denied) {
       permissionGranted = await _location.requestPermission();
       if (permissionGranted != PermissionStatus.granted) return;
     }
+
     final loc = await _location.getLocation();
     if (loc.latitude != null && loc.longitude != null) {
       final newLocation = LatLng(loc.latitude!, loc.longitude!);
@@ -133,6 +130,7 @@ class _MapScreenState extends State<MapScreen> {
       });
       _mapController.move(newLocation, 15);
     }
+
     _location.onLocationChanged.listen((loc) {
       if (loc.latitude != null && loc.longitude != null) {
         final updatedLocation = LatLng(loc.latitude!, loc.longitude!);
@@ -170,71 +168,126 @@ class _MapScreenState extends State<MapScreen> {
         setState(() => pathPoints = route);
         _mapController.move(destination, 16);
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error drawing route: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error drawing route: $e')));
       }
     }
   }
 
   void _showStationDetails(Station station) {
     _drawRouteToStation(LatLng(station.lat, station.lng));
+
     final availableBikes = station.bikes.where((b) => b.isAvailable).toList();
     final unavailableBikes = station.bikes.where((b) => !b.isAvailable).toList();
 
     showModalBottomSheet(
       context: context,
-      builder: (context) => ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text(station.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          Text(station.description),
-          const SizedBox(height: 16),
-          Text('Available Bikes (${availableBikes.length})'),
-          ...availableBikes.map(
-            (bike) => ListTile(
-              title: Text(bike.name),
-              subtitle: Text('Rs. ${bike.pricePerMinute}/min'),
-              trailing: ElevatedButton(
-                onPressed: () async {
-                  Navigator.pop(context);
-                  final start = DateTime.now();
-                  await Future.delayed(const Duration(seconds: 2));
-                  final end = DateTime.now();
-                  final duration = end.difference(start);
-                  final minutes = duration.inMinutes + 1;
-                  final fare = (bike.pricePerMinute * minutes).toStringAsFixed(2);
-
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Ride Complete'),
-                      content: Text(
-                        'Bike: ${bike.name}\nDuration: $minutes min\nFare: Rs. $fare\n(Payment via eSewa simulated)',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('OK'),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-                child: const Text('Unlock'),
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        expand: false,
+        maxChildSize: 0.75,
+        minChildSize: 0.3,
+        initialChildSize: 0.5,
+        builder: (context, scrollController) => Container(
+          padding: const EdgeInsets.all(16),
+          child: ListView(
+            controller: scrollController,
+            children: [
+              Text(
+                station.name,
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-            ),
+              Text(station.description),
+              const SizedBox(height: 16),
+              Text('Available Bikes (${availableBikes.length})'),
+              const SizedBox(height: 12),
+              if (availableBikes.isEmpty)
+                const Center(child: Text('No bikes available.'))
+              else
+                ...availableBikes.map(
+                  (bike) => Card(
+                    child: ListTile(
+                      title: Text(bike.name),
+                      subtitle: Text('Rs. ${bike.pricePerMinute}/min'),
+                      trailing: ElevatedButton(
+                        onPressed: () => _unlockBike(bike),
+                        child: const Text('Unlock'),
+                      ),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 16),
+              Text('Unavailable Bikes (${unavailableBikes.length})', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+              const SizedBox(height: 12),
+              if (unavailableBikes.isEmpty)
+                const Center(child: Text('No unavailable bikes.'))
+              else
+                ...unavailableBikes.map(
+                  (bike) => Card(
+                    color: Colors.grey[200],
+                    child: ListTile(
+                      title: Text(bike.name),
+                      subtitle: Text('Available in ${bike.availableInMinutes ?? '?'} mins'),
+                    ),
+                  ),
+                ),
+            ],
           ),
-          const Divider(),
-          Text('Unavailable Bikes (${unavailableBikes.length})'),
-          ...unavailableBikes.map(
-            (bike) => ListTile(
-              title: Text(bike.name),
-              subtitle: Text('Available in ${bike.availableInMinutes} min'),
-              trailing: const Icon(Icons.lock, color: Colors.red),
-            ),
-          ),
-        ],
+        ),
       ),
     );
+  }
+
+  Future<void> _unlockBike(Bike bike) async {
+    final now = DateTime.now();
+    final unlockUrl = Uri.parse('https://backend-bicycle.onrender.com/api/v1/bikes/${bike.id}/unlock');
+
+    try {
+      final response = await http.post(unlockUrl);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final startTime = DateTime.parse(data['startTime']);
+
+        await Future.delayed(const Duration(seconds: 5));
+
+        final endTime = DateTime.now();
+        final stopUrl = Uri.parse('https://backend-bicycle.onrender.com/api/v1/bikes/${bike.id}/stop');
+
+        final stopResponse = await http.post(
+          stopUrl,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'endTime': endTime.toIso8601String()}),
+        );
+
+        if (stopResponse.statusCode == 200) {
+          final fareData = jsonDecode(stopResponse.body);
+          final fare = fareData['fare'];
+
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Ride Completed'),
+              content: Text('Total fare: Rs. ${fare.toStringAsFixed(2)}'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Close'),
+                ),
+              ],
+            ),
+          );
+        } else {
+          throw Exception('Failed to end ride');
+        }
+      } else {
+        throw Exception('Unlock failed');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
   }
 
   @override
