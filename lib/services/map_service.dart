@@ -5,7 +5,7 @@ import 'package:latlong2/latlong.dart';
 class MapService {
   static Future<List<LatLng>> getRoute(LatLng start, LatLng end) async {
     final url = Uri.parse(
-      'http://router.project-osrm.org/route/v1/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?overview=full&geometries=geojson',
+      'http://router.project-osrm.org/route/v1/bike/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?overview=full&geometries=geojson',
     );
 
     final response = await http.get(url);

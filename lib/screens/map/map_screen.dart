@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
+import 'package:zupito/screens/map/widgets/user_profile_modal.dart';
+import 'package:zupito/screens/map/widgets/user_profile_panel.dart';
 
 import '../../models/station.dart';
 import '../../models/user.dart';
 import '../../../services/ride_service.dart';
+import '../../../services/station_service.dart';
 
 import 'widgets/station_marker.dart';
 import 'widgets/station_bottom_sheet.dart';
-import 'widgets/user_profile_modal.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -24,9 +26,18 @@ class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
   Marker? _currentLocationMarker;
   List<LatLng> pathPoints = [];
+  List<Station> _stations = [];
 
-  final List<Station> _stations = []; // Load from backend or static
-  final UserProfile _userProfile = UserProfile();
+  final UserProfile _userProfile = UserProfile(
+    id: '123',
+    name: 'Maryam Uddin',
+    email: 'maryam@example.com',
+    walletBalance: 250.0,
+    totalRides: 12,
+    totalDistance: 35.7,
+    membershipLevel: 'Premium',
+    joinedDate: DateTime(2024, 5, 10),
+  );
 
   final List<LatLng> _lalitpurBoundary = [
     LatLng(27.6912, 85.3127),
@@ -45,11 +56,9 @@ class _MapScreenState extends State<MapScreen> {
       if (((_lalitpurBoundary[i].latitude > point.latitude) !=
               (_lalitpurBoundary[j].latitude > point.latitude)) &&
           (point.longitude <
-              (_lalitpurBoundary[j].longitude -
-                          _lalitpurBoundary[i].longitude) *
+              (_lalitpurBoundary[j].longitude - _lalitpurBoundary[i].longitude) *
                       (point.latitude - _lalitpurBoundary[i].latitude) /
-                      (_lalitpurBoundary[j].latitude -
-                          _lalitpurBoundary[i].latitude) +
+                      (_lalitpurBoundary[j].latitude - _lalitpurBoundary[i].latitude) +
                   _lalitpurBoundary[i].longitude)) {
         inside = !inside;
       }
@@ -61,6 +70,24 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     _initLocation();
+    _loadStations();
+  }
+
+  Future<void> _loadStations() async {
+    try {
+      final stations = await StationService.fetchStations();
+      setState(() {
+        _stations.clear();
+        _stations.addAll(stations);
+      });
+      if (_stations.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _mapController.move(LatLng(_stations[0].lat, _stations[0].lng), 16);
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Error fetching stations: $e');
+    }
   }
 
   Future<void> _initLocation() async {
@@ -83,12 +110,22 @@ class _MapScreenState extends State<MapScreen> {
         _currentLocation = newLocation;
         _currentLocationMarker = Marker(
           point: newLocation,
-          width: 50,
-          height: 50,
-          child: const Icon(Icons.my_location, color: Colors.blue, size: 40),
+          width: 60,
+          height: 60,
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.blue,
+              border: Border.all(color: Colors.white, width: 3),
+            ),
+            child: const Icon(Icons.person_pin_circle, color: Colors.white, size: 32),
+          ),
         );
       });
-      _mapController.move(newLocation, 15);
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _mapController.move(newLocation, 15);
+      });
     }
 
     _location.onLocationChanged.listen((loc) {
@@ -98,14 +135,20 @@ class _MapScreenState extends State<MapScreen> {
           _currentLocation = updatedLocation;
           _currentLocationMarker = Marker(
             point: updatedLocation,
-            width: 50,
-            height: 50,
-            child: const Icon(Icons.my_location, color: Colors.blue, size: 40),
+            width: 60,
+            height: 60,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.blue,
+                border: Border.all(color: Colors.white, width: 3),
+              ),
+              child: const Icon(Icons.person_pin_circle, color: Colors.white, size: 32),
+            ),
           );
         });
 
-        bool inside = isInsideLalitpur(updatedLocation);
-        if (!inside) {
+        if (!isInsideLalitpur(updatedLocation)) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -132,7 +175,7 @@ class _MapScreenState extends State<MapScreen> {
     showStationBottomSheet(context, station, _userProfile);
   }
 
-  void _showUserProfile() => showUserProfileModal(context, _userProfile);
+  void _showUserProfile() => showUserProfilePanel(context, _userProfile);
 
   @override
   Widget build(BuildContext context) {
@@ -154,44 +197,72 @@ class _MapScreenState extends State<MapScreen> {
       ),
       body: _currentLocation == null
           ? const Center(child: CircularProgressIndicator())
-          : FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(center: _currentLocation, zoom: 15),
+          : Stack(
               children: [
-                TileLayer(
-                  urlTemplate:
-                      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  subdomains: ['a', 'b', 'c'],
-                ),
-                PolygonLayer(
-                  polygons: [
-                    Polygon(
-                      points: _lalitpurBoundary,
-                      color: Colors.green.withOpacity(0.2),
-                      borderStrokeWidth: 3.0,
-                      borderColor: Colors.green,
+                FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(center: _currentLocation, zoom: 15),
+                  children: [
+                    TileLayer(
+                      urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      subdomains: ['a', 'b', 'c'],
+                    ),
+                    PolygonLayer(
+                      polygons: [
+                        Polygon(
+                          points: _lalitpurBoundary,
+                          color: Colors.green.withOpacity(0.2),
+                          borderStrokeWidth: 3.0,
+                          borderColor: Colors.red,
+                        ),
+                      ],
+                    ),
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: pathPoints,
+                          color: Colors.red,
+                          strokeWidth: 4.0,
+                        ),
+                      ],
+                    ),
+                    MarkerLayer(
+                      markers: [
+                        ..._stations.map(
+                          (station) => StationMarker(
+                            station: station,
+                            onTap: () => _showStationDetails(station),
+                          ).marker,
+                        ),
+                        if (_currentLocationMarker != null) _currentLocationMarker!,
+                      ],
                     ),
                   ],
                 ),
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: pathPoints,
-                      color: Colors.red,
-                      strokeWidth: 4.0,
-                    ),
-                  ],
-                ),
-                MarkerLayer(
-                  markers: [
-                    ..._stations.map(
-                      (station) => StationMarker(
-                        station: station,
-                        onTap: () => _showStationDetails(station),
-                      ).marker,
-                    ),
-                    if (_currentLocationMarker != null) _currentLocationMarker!,
-                  ],
+                Positioned(
+                  bottom: 80,
+                  right: 10,
+                  child: Column(
+                    children: [
+                      FloatingActionButton(
+                        mini: true,
+                        onPressed: () {
+                          final zoom = _mapController.zoom + 1;
+                          _mapController.move(_mapController.center, zoom);
+                        },
+                        child: const Icon(Icons.zoom_in),
+                      ),
+                      const SizedBox(height: 8),
+                      FloatingActionButton(
+                        mini: true,
+                        onPressed: () {
+                          final zoom = _mapController.zoom - 1;
+                          _mapController.move(_mapController.center, zoom);
+                        },
+                        child: const Icon(Icons.zoom_out),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

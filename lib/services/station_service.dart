@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/station.dart';
 
 class StationService {
-  static const String baseUrl = 'https://backend-bicycle.onrender.com';
+  static const String baseUrl = 'https://backend-bicycle-1.onrender.com';
 
   static Future<List<Station>> fetchStations() async {
     final url = Uri.parse('$baseUrl/api/v1/stations');

@@ -1,66 +1,49 @@
-class RideHistoryEntry {
-  final String bikeId;
-  final double fare;
-  final DateTime date;
-
-  RideHistoryEntry({
-    required this.bikeId,
-    required this.fare,
-    required this.date,
-  });
-
-  factory RideHistoryEntry.fromJson(Map<String, dynamic> json) {
-    return RideHistoryEntry(
-      bikeId: json['bikeId'],
-      fare: (json['fare'] as num).toDouble(),
-      date: DateTime.parse(json['date']),
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'bikeId': bikeId,
-      'fare': fare,
-      'date': date.toIso8601String(),
-    };
-  }
-}
-
 class UserProfile {
-  double totalFare;
-  int totalRides;
-  List<RideHistoryEntry> rideHistory;
+  final String id;
+  final String name;
+  final String email;
+  final double walletBalance;
+  final int totalRides;
+  final double totalDistance;
+  final String membershipLevel;
+  final DateTime joinedDate;
 
   UserProfile({
-    this.totalFare = 0.0,
-    this.totalRides = 0,
-    List<RideHistoryEntry>? rideHistory,
-  }) : rideHistory = rideHistory ?? [];
-
-  void addRide(String bikeId, double fare) {
-    totalRides++;
-    totalFare += fare;
-    rideHistory.add(
-      RideHistoryEntry(bikeId: bikeId, fare: fare, date: DateTime.now()),
-    );
-  }
+    required this.id,
+    required this.name,
+    required this.email,
+    required this.walletBalance,
+    required this.totalRides,
+    required this.totalDistance,
+    required this.membershipLevel,
+    required this.joinedDate,
+  });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
-      totalFare: (json['totalFare'] as num?)?.toDouble() ?? 0.0,
+      id: json['_id'] ?? '',
+      name: json['name'] ?? '',
+      email: json['email'] ?? '',
+      walletBalance: (json['walletBalance'] ?? 0).toDouble(),
       totalRides: json['totalRides'] ?? 0,
-      rideHistory: (json['rideHistory'] as List<dynamic>?)
-              ?.map((e) => RideHistoryEntry.fromJson(e))
-              .toList() ??
-          [],
+      totalDistance: (json['totalDistance'] ?? 0).toDouble(),
+      membershipLevel: json['membershipLevel'] ?? 'Free',
+      joinedDate: json['joinedDate'] != null
+          ? DateTime.parse(json['joinedDate'])
+          : DateTime.now(),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'totalFare': totalFare,
+      '_id': id,
+      'name': name,
+      'email': email,
+      'walletBalance': walletBalance,
       'totalRides': totalRides,
-      'rideHistory': rideHistory.map((e) => e.toJson()).toList(),
+      'totalDistance': totalDistance,
+      'membershipLevel': membershipLevel,
+      'joinedDate': joinedDate.toIso8601String(),
     };
   }
 }

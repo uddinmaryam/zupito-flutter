@@ -4,7 +4,7 @@ import '../models/bike.dart';
 
 class BikeService {
   static const String baseUrl =
-      'https://backend-bicycle.onrender.com/api/v1/bikes';
+      'https://backend-bicycle-1.onrender.com/api/v1/bikes';
 
   // Unlock a bike
   static Future<DateTime> unlockBike(String bikeId) async {

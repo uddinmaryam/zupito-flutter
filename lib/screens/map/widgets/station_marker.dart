@@ -7,21 +7,17 @@ class StationMarker extends StatelessWidget {
   final Station station;
   final VoidCallback onTap;
 
-  const StationMarker({
-    super.key,
-    required this.station,
-    required this.onTap,
-  });
+  const StationMarker({super.key, required this.station, required this.onTap});
 
   Marker get marker => Marker(
-        point: LatLng(station.lat, station.lng),
-        width: 60,
-        height: 60,
-        child: IconButton(
-          icon: const Icon(Icons.location_on, color: Colors.black, size: 35),
-          onPressed: onTap,
-        ),
-      );
+    point: LatLng(station.lat, station.lng),
+    width: 60,
+    height: 60,
+    child: IconButton(
+      icon: const Icon(Icons.location_on, color: Colors.black, size: 40),
+      onPressed: onTap,
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
