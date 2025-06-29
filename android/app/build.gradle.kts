@@ -19,6 +19,10 @@ android {
         versionCode = 1
         versionName = "1.0"
     }
+    lint{
+        checkReleaseBuilds = false
+    }
+
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

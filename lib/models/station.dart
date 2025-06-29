@@ -22,9 +22,9 @@ class Station {
       id: json['_id'] ?? '',
       name: json['name'] ?? '',
       description: json['description'] ?? '',
-      lat: (json['location']['lat'] as num).toDouble(),
-      lng: (json['location']['lng'] as num).toDouble(),
-      bikes: (json['bikes'] as List<dynamic>)
+      lat: (json['latitude'] as num).toDouble(),
+      lng: (json['longitude'] as num).toDouble(),
+      bikes: (json['bikes'] as List<dynamic>? ?? [])
           .map((bike) => Bike.fromJson(bike))
           .toList(),
     );
@@ -35,10 +35,8 @@ class Station {
       '_id': id,
       'name': name,
       'description': description,
-      'location': {
-        'lat': lat,
-        'lng': lng,
-      },
+      'latitude': lat,
+      'longitude': lng,
       'bikes': bikes.map((bike) => bike.toJson()).toList(),
     };
   }

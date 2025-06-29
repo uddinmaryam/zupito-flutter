@@ -2,16 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
-import 'package:zupito/screens/map/widgets/user_profile_modal.dart';
-import 'package:zupito/screens/map/widgets/user_profile_panel.dart';
-
 import '../../models/station.dart';
-import '../../models/user.dart';
-import '../../../services/ride_service.dart';
 import '../../../services/station_service.dart';
-
-import 'widgets/station_marker.dart';
-import 'widgets/station_bottom_sheet.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -25,19 +17,7 @@ class _MapScreenState extends State<MapScreen> {
   final Location _location = Location();
   final MapController _mapController = MapController();
   Marker? _currentLocationMarker;
-  List<LatLng> pathPoints = [];
-  List<Station> _stations = [];
-
-  final UserProfile _userProfile = UserProfile(
-    id: '123',
-    name: 'Maryam Uddin',
-    email: 'maryam@example.com',
-    walletBalance: 250.0,
-    totalRides: 12,
-    totalDistance: 35.7,
-    membershipLevel: 'Premium',
-    joinedDate: DateTime(2024, 5, 10),
-  );
+  final List<Station> _stations = [];
 
   final List<LatLng> _lalitpurBoundary = [
     LatLng(27.6912, 85.3127),
@@ -50,15 +30,20 @@ class _MapScreenState extends State<MapScreen> {
   ];
 
   bool isInsideLalitpur(LatLng point) {
-    int i = 0, j = _lalitpurBoundary.length - 1;
     bool inside = false;
-    for (; i < _lalitpurBoundary.length; j = i++) {
+    for (
+      int i = 0, j = _lalitpurBoundary.length - 1;
+      i < _lalitpurBoundary.length;
+      j = i++
+    ) {
       if (((_lalitpurBoundary[i].latitude > point.latitude) !=
               (_lalitpurBoundary[j].latitude > point.latitude)) &&
           (point.longitude <
-              (_lalitpurBoundary[j].longitude - _lalitpurBoundary[i].longitude) *
+              (_lalitpurBoundary[j].longitude -
+                          _lalitpurBoundary[i].longitude) *
                       (point.latitude - _lalitpurBoundary[i].latitude) /
-                      (_lalitpurBoundary[j].latitude - _lalitpurBoundary[i].latitude) +
+                      (_lalitpurBoundary[j].latitude -
+                          _lalitpurBoundary[i].latitude) +
                   _lalitpurBoundary[i].longitude)) {
         inside = !inside;
       }
@@ -76,17 +61,27 @@ class _MapScreenState extends State<MapScreen> {
   Future<void> _loadStations() async {
     try {
       final stations = await StationService.fetchStations();
+      print('✅ STATIONS FETCHED: ${stations.length}');
+      for (var s in stations) {
+        print('📍 ${s.name} → (${s.lat}, ${s.lng})');
+      }
       setState(() {
         _stations.clear();
         _stations.addAll(stations);
       });
-      if (_stations.isNotEmpty) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _mapController.move(LatLng(_stations[0].lat, _stations[0].lng), 16);
-        });
+
+      if (stations.isEmpty && mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('No stations found')));
       }
     } catch (e) {
       debugPrint('❌ Error fetching stations: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error fetching stations: $e')));
+      }
     }
   }
 
@@ -118,7 +113,11 @@ class _MapScreenState extends State<MapScreen> {
               color: Colors.blue,
               border: Border.all(color: Colors.white, width: 3),
             ),
-            child: const Icon(Icons.person_pin_circle, color: Colors.white, size: 32),
+            child: const Icon(
+              Icons.person_pin_circle,
+              color: Colors.white,
+              size: 32,
+            ),
           ),
         );
       });
@@ -143,7 +142,11 @@ class _MapScreenState extends State<MapScreen> {
                 color: Colors.blue,
                 border: Border.all(color: Colors.white, width: 3),
               ),
-              child: const Icon(Icons.person_pin_circle, color: Colors.white, size: 32),
+              child: const Icon(
+                Icons.person_pin_circle,
+                color: Colors.white,
+                size: 32,
+              ),
             ),
           );
         });
@@ -162,21 +165,6 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  void _showStationDetails(Station station) {
-    if (_currentLocation == null) return;
-
-    drawRoute(context, _currentLocation!, LatLng(station.lat, station.lng), (
-      routePoints,
-    ) {
-      setState(() => pathPoints = routePoints);
-      _mapController.move(LatLng(station.lat, station.lng), 16);
-    });
-
-    showStationBottomSheet(context, station, _userProfile);
-  }
-
-  void _showUserProfile() => showUserProfilePanel(context, _userProfile);
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -188,89 +176,47 @@ class _MapScreenState extends State<MapScreen> {
           "Explore Zupito Rides",
           style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.account_circle, color: Colors.black87),
-            onPressed: _showUserProfile,
-          ),
-        ],
       ),
       body: _currentLocation == null
           ? const Center(child: CircularProgressIndicator())
-          : Stack(
+          : FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(center: _currentLocation, zoom: 15),
               children: [
-                FlutterMap(
-                  mapController: _mapController,
-                  options: MapOptions(center: _currentLocation, zoom: 15),
-                  children: [
-                    TileLayer(
-                      urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      subdomains: ['a', 'b', 'c'],
-                    ),
-                    PolygonLayer(
-                      polygons: [
-                        Polygon(
-                          points: _lalitpurBoundary,
-                          color: Colors.green.withOpacity(0.2),
-                          borderStrokeWidth: 3.0,
-                          borderColor: Colors.red,
-                        ),
-                      ],
-                    ),
-                    PolylineLayer(
-                      polylines: [
-                        Polyline(
-                          points: pathPoints,
-                          color: Colors.red,
-                          strokeWidth: 4.0,
-                        ),
-                      ],
-                    ),
-                    MarkerLayer(
-                      markers: [
-                        ..._stations.map(
-                          (station) => StationMarker(
-                            station: station,
-                            onTap: () => _showStationDetails(station),
-                          ).marker,
-                        ),
-                        if (_currentLocationMarker != null) _currentLocationMarker!,
-                      ],
+                TileLayer(
+                  urlTemplate:
+                      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  subdomains: const ['a', 'b', 'c'],
+                ),
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: _lalitpurBoundary + [_lalitpurBoundary[0]],
+                      strokeWidth: 2.5,
+                      color: Colors.red,
+                      isDotted: true,
                     ),
                   ],
                 ),
-                Positioned(
-                  bottom: 80,
-                  right: 10,
-                  child: Column(
-                    children: [
-                      FloatingActionButton(
-                        mini: true,
-                        onPressed: () {
-                          final zoom = _mapController.zoom + 1;
-                          _mapController.move(_mapController.center, zoom);
-                        },
-                        child: const Icon(Icons.zoom_in),
+                MarkerLayer(
+                  markers: [
+                    ..._stations.map(
+                      (station) => Marker(
+                        point: LatLng(station.lat, station.lng),
+                        width: 60,
+                        height: 60,
+                        child: const Icon(
+                          Icons.location_on,
+                          color: Colors.red,
+                          size: 40,
+                        ),
                       ),
-                      const SizedBox(height: 8),
-                      FloatingActionButton(
-                        mini: true,
-                        onPressed: () {
-                          final zoom = _mapController.zoom - 1;
-                          _mapController.move(_mapController.center, zoom);
-                        },
-                        child: const Icon(Icons.zoom_out),
-                      ),
-                    ],
-                  ),
+                    ),
+                    if (_currentLocationMarker != null) _currentLocationMarker!,
+                  ],
                 ),
               ],
             ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.indigo,
-        onPressed: _initLocation,
-        child: const Icon(Icons.my_location, color: Colors.white),
-      ),
     );
   }
 }
