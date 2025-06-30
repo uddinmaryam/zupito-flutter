@@ -10,4 +10,22 @@ class Ride {
     required this.startTime,
     required this.endTime,
   });
+
+  factory Ride.fromJson(Map<String, dynamic> json) {
+    return Ride(
+      bikeId: json['bikeId'],
+      fare: (json['fare'] as num).toDouble(),
+      startTime: DateTime.parse(json['startTime']),
+      endTime: DateTime.parse(json['endTime']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'bikeId': bikeId,
+      'fare': fare,
+      'startTime': startTime.toIso8601String(),
+      'endTime': endTime.toIso8601String(),
+    };
+  }
 }

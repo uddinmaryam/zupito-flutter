@@ -27,6 +27,7 @@ dependencies:
     git:
       url: https://github.com/juliuscanute/qr_code_scanner.git
       ref: master
+  flutter_local_notifications: ^19.3.0
 
 dev_dependencies:
   flutter_test:

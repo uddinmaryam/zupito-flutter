@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:zupito/screens/map/map_screen.dart';
 import '../services/auth_service.dart';
@@ -51,10 +52,15 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-    final token = await authService.login(username, password);
+    final result = await authService.login(username, password);
 
-    if (token != null) {
-      await _secureStorage.saveToken(token);
+    if (result != null &&
+        result is Map<String, dynamic> &&
+        result['token'] != null &&
+        result['user'] != null) {
+      await _secureStorage.saveToken(result['token']);
+      await _secureStorage.saveUser(jsonEncode(result['user']));
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const MapScreen()),

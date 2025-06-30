@@ -1,9 +1,17 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
+import 'package:zupito/screens/map/widgets/station_bottom_sheet.dart';
+
 import '../../models/station.dart';
+import '../../models/bike.dart';
+import '../../models/user.dart';
 import '../../../services/station_service.dart';
+import '../../../services/secure_storage_services.dart';
+import '../../widgets/station_bottom_sheet.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -18,6 +26,7 @@ class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
   Marker? _currentLocationMarker;
   final List<Station> _stations = [];
+  final SecureStorageService _secureStorage = SecureStorageService();
 
   final List<LatLng> _lalitpurBoundary = [
     LatLng(27.6912, 85.3127),
@@ -28,6 +37,8 @@ class _MapScreenState extends State<MapScreen> {
     LatLng(27.6804, 85.2918),
     LatLng(27.6901, 85.2991),
   ];
+
+  UserProfile? _userProfile;
 
   bool isInsideLalitpur(LatLng point) {
     bool inside = false;
@@ -55,16 +66,27 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     _initLocation();
+    _loadUserProfile();
     _loadStations();
+  }
+
+  Future<void> _loadUserProfile() async {
+    final userData = await _secureStorage.readUser();
+    debugPrint("🔍 SecureStorage returned user: $userData");
+
+    if (userData != null) {
+      final json = jsonDecode(userData);
+      setState(() {
+        _userProfile = UserProfile.fromJson(json);
+      });
+    } else {
+      debugPrint("⚠️ No user found in secure storage.");
+    }
   }
 
   Future<void> _loadStations() async {
     try {
       final stations = await StationService.fetchStations();
-      print('✅ STATIONS FETCHED: ${stations.length}');
-      for (var s in stations) {
-        print('📍 ${s.name} → (${s.lat}, ${s.lng})');
-      }
       setState(() {
         _stations.clear();
         _stations.addAll(stations);
@@ -165,6 +187,16 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
+  void _onStationTap(Station station) {
+    if (_userProfile != null) {
+      showStationBottomSheet(context, station, _userProfile!);
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("User not logged in.")));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -205,10 +237,13 @@ class _MapScreenState extends State<MapScreen> {
                         point: LatLng(station.lat, station.lng),
                         width: 60,
                         height: 60,
-                        child: const Icon(
-                          Icons.location_on,
-                          color: Colors.red,
-                          size: 40,
+                        child: GestureDetector(
+                          onTap: () => _onStationTap(station),
+                          child: const Icon(
+                            Icons.location_on,
+                            color: Colors.indigo,
+                            size: 40,
+                          ),
                         ),
                       ),
                     ),

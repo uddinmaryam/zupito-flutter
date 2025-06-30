@@ -1,8 +1,6 @@
 plugins {
     id("com.android.application")
-    // START: FlutterFire Configuration
-    id("com.google.gms.google-services")
-    // END: FlutterFire Configuration
+    id("com.google.gms.google-services") // Firebase
     id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -19,10 +17,10 @@ android {
         versionCode = 1
         versionName = "1.0"
     }
-    lint{
+
+    lint {
         checkReleaseBuilds = false
     }
-
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -47,5 +45,5 @@ flutter {
 
 dependencies {
     implementation("com.google.android.gms:play-services-auth:20.7.0")
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

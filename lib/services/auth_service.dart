@@ -10,7 +10,8 @@ class AuthService {
   final SecureStorageService _secureStorage = SecureStorageService();
 
   // 🔐 Login
-  Future<String?> login(String username, String password) async {
+  // 🔐 Login
+  Future<Map<String, dynamic>?> login(String username, String password) async {
     final url = Uri.parse('$baseUrl/login');
 
     try {
@@ -24,11 +25,23 @@ class AuthService {
         final data = jsonDecode(response.body);
         print("✅ Login successful. Response data: $data");
 
-        if (data['token'] != null) {
-          await _secureStorage.saveToken(data['token']);
-          return data['token'];
+        final token = data['token'];
+        final user = data['user'];
+
+        if (token != null && user != null) {
+          // ✅ Save token
+          await _secureStorage.saveToken(token);
+
+          // ✅ Save user ID (or username as fallback)
+          await _secureStorage.saveUserId(user['_id'] ?? username);
+
+          // ✅ Save full user JSON
+          await _secureStorage.saveUser(jsonEncode(user));
+
+          // ✅ Return both token and user
+          return {'token': token, 'user': user};
         } else {
-          print("❌ Token is missing in response.");
+          print("❌ Token or user is missing in response.");
           return null;
         }
       } else {
@@ -65,7 +78,7 @@ class AuthService {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         print('✅ Signup successful');
-        return true;  // Return true to indicate success
+        return true;
       } else {
         print('❌ Signup failed with status ${response.statusCode}');
         print('❌ Response body: ${response.body}');

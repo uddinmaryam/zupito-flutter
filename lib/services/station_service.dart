@@ -11,8 +11,10 @@ class StationService {
     final response = await http.get(url);
 
     if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body); // ✅ FIXED HERE
-      final stations = data.map((json) => Station.fromJson(json)).toList();
+      final data = jsonDecode(response.body); // ✅ Now it's a Map
+      final stations = (data['stations'] as List)
+          .map((json) => Station.fromJson(json))
+          .toList();
       return stations;
     } else {
       print('Error ${response.statusCode}: ${response.body}');
