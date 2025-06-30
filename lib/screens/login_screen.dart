@@ -4,6 +4,7 @@ import 'package:zupito/screens/map/map_screen.dart';
 import '../services/auth_service.dart';
 import '../services/secure_storage_services.dart';
 import 'signup_screen.dart';
+import '../services/otp_socket_service.dart'; // ✅ Socket Service Import
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -52,22 +53,37 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-    final result = await authService.login(username, password);
+    try {
+      final result = await authService.login(username, password);
 
-    if (result != null &&
-        result is Map<String, dynamic> &&
-        result['token'] != null &&
-        result['user'] != null) {
-      await _secureStorage.saveToken(result['token']);
-      await _secureStorage.saveUser(jsonEncode(result['user']));
+      if (result != null &&
+          result is Map<String, dynamic> &&
+          result['token'] != null &&
+          result['user'] != null) {
+        await _secureStorage.saveToken(result['token']);
+        await _secureStorage.saveUser(jsonEncode(result['user']));
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MapScreen()),
-      );
-    } else {
+        final userId = result['user']['_id'] ?? result['user']['id'];
+        if (userId != null) {
+          print('📡 Connecting socket for userId: $userId');
+          OtpSocketService().connect(userId, context: context);
+        } else {
+          print('⚠️ No userId found in login response');
+        }
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MapScreen()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login failed. Check credentials.')),
+        );
+      }
+    } catch (e) {
+      print("❌ Login exception: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Login failed. Check credentials.')),
+        const SnackBar(content: Text('An error occurred during login.')),
       );
     }
   }

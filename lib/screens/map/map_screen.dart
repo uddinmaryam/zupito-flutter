@@ -4,14 +4,14 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
-import 'package:zupito/screens/map/widgets/station_bottom_sheet.dart';
 
 import '../../models/station.dart';
 import '../../models/bike.dart';
 import '../../models/user.dart';
 import '../../../services/station_service.dart';
 import '../../../services/secure_storage_services.dart';
-import '../../widgets/station_bottom_sheet.dart';
+import 'widgets/station_bottom_sheet.dart'; // ✅ Use only this import
+
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});

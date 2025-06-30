@@ -6,6 +6,7 @@ import 'package:zupito/main.dart'; // for showUnlockNotification
 import 'package:zupito/models/bike.dart';
 import '../../../models/station.dart';
 import '../../../models/user.dart';
+import '../../../services/secure_storage_services.dart';
 
 void showStationBottomSheet(
   BuildContext context,
@@ -122,20 +123,31 @@ class _BikeCardState extends State<_BikeCard> {
   Future<void> _handleUnlock() async {
     setState(() => _loading = true);
 
+    final storage = SecureStorageService();
+    final userJson = await storage.readUser();
+    final userId = userJson != null ? jsonDecode(userJson)['_id'] : null;
+
+    if (userId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("❌ User not found.")));
+      setState(() => _loading = false);
+      return;
+    }
+
     try {
-      // STEP 1: Generate OTP
+      // ✅ STEP 1: Send userId to generate OTP
       final otpGen = await http.post(
-        Uri.parse(
-          'https://backend-bicycle-1.onrender.com/api/v1/bikes/generate-otp',
-        ),
+        Uri.parse('https://backend-bicycle-1.onrender.com/api/v1/otp/generate'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'code': widget.bike.code}),
+        body: jsonEncode({'bikeCode': widget.bike.code, 'userId': userId}),
       );
 
       if (otpGen.statusCode == 200) {
-        await showUnlockNotification(widget.bike.name); // Local notification
+        // ✅ Now the OTP will come via WebSocket, not from here
+        await showUnlockNotification(widget.bike.name);
 
-        // STEP 2: Ask user to input OTP
+        // Show dialog to enter OTP manually (from notification or WebSocket message)
         await showDialog(
           context: context,
           barrierDismissible: false,
@@ -206,6 +218,8 @@ class _BikeCardState extends State<_BikeCard> {
       ),
     );
   }
+
+  Future<void> showUnlockNotification(String name) async {}
 }
 
 class OTPDialog extends StatefulWidget {
