@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:overlay_support/overlay_support.dart'; // ✅ Add this
 import 'package:zupito/screens/map/map_screen.dart';
 import 'firebase_options.dart';
-
 import 'package:zupito/screens/login_screen.dart';
 import 'package:zupito/screens/splash_screen.dart';
 import 'package:zupito/screens/phone_number_screen.dart';
@@ -26,16 +26,19 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Zupito',
-      debugShowCheckedModeBanner: false,
-      initialRoute: '/splash',
-      routes: {
-        '/splash': (context) => SplashScreen(),
-        '/login': (context) => LoginScreen(), // removed const if needed
-        '/home': (context) => MapScreen(), // removed const
-        '/phone': (context) => const PhoneNumberScreen(),
-      },
+    return OverlaySupport.global(
+      // ✅ Wrap here
+      child: MaterialApp(
+        title: 'Zupito',
+        debugShowCheckedModeBanner: false,
+        initialRoute: '/splash',
+        routes: {
+          '/splash': (context) => SplashScreen(),
+          '/login': (context) => const LoginScreen(),
+          '/home': (context) => const MapScreen(),
+          '/phone': (context) => const PhoneNumberScreen(),
+        },
+      ),
     );
   }
 }

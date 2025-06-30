@@ -29,6 +29,7 @@ dependencies:
       ref: master
   flutter_local_notifications: ^19.3.0
   socket_io_client: ^2.0.3
+  overlay_support: ^2.0.0
 
 dev_dependencies:
   flutter_test:

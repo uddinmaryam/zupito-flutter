@@ -7,10 +7,13 @@ class OtpSocketService {
   OtpSocketService._internal();
 
   late IO.Socket socket;
+  BuildContext? _context;
   bool _isConnected = false;
 
   void connect(String userId, {required BuildContext context}) {
     if (_isConnected) return;
+
+    _context = context;
 
     socket = IO.io('https://backend-bicycle-1.onrender.com', <String, dynamic>{
       'transports': ['websocket'],
@@ -23,22 +26,30 @@ class OtpSocketService {
     socket.onConnect((_) {
       _isConnected = true;
       print('✅ Connected to WebSocket');
-      print('📡 Registering socket with userId: $userId'); // <-- 👈 ADDED LINE
+      print('📡 Registering socket with userId: $userId');
       socket.emit('register', userId);
     });
 
     socket.on('otp', (data) {
-      print("🔐 OTP received: ${data['otp']} for bike ${data['bikeCode']}");
-
       final otp = data['otp'];
       final bike = data['bikeCode'];
+      print("🔐 OTP received: $otp for bike $bike");
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("🔐 OTP for $bike: $otp"),
-          duration: const Duration(seconds: 10),
-        ),
-      );
+      if (_context != null) {
+        showDialog(
+          context: _context!,
+          builder: (ctx) => AlertDialog(
+            title: const Text("🔐 OTP Received"),
+            content: Text("Your OTP for $bike is: $otp"),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("OK"),
+              ),
+            ],
+          ),
+        );
+      }
     });
 
     socket.onDisconnect((_) {

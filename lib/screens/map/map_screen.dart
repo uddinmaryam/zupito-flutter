@@ -10,8 +10,8 @@ import '../../models/bike.dart';
 import '../../models/user.dart';
 import '../../../services/station_service.dart';
 import '../../../services/secure_storage_services.dart';
+import '../../../services/otp_socket_service.dart'; // ✅ Add this line
 import 'widgets/station_bottom_sheet.dart'; // ✅ Use only this import
-
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -76,9 +76,13 @@ class _MapScreenState extends State<MapScreen> {
 
     if (userData != null) {
       final json = jsonDecode(userData);
+      final user = UserProfile.fromJson(json);
       setState(() {
-        _userProfile = UserProfile.fromJson(json);
+        _userProfile = user;
       });
+
+      // ✅ Correct place to connect
+      OtpSocketService().connect(user.id, context: context);
     } else {
       debugPrint("⚠️ No user found in secure storage.");
     }
