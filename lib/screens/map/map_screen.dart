@@ -42,19 +42,13 @@ class _MapScreenState extends State<MapScreen> {
 
   bool isInsideLalitpur(LatLng point) {
     bool inside = false;
-    for (
-      int i = 0, j = _lalitpurBoundary.length - 1;
-      i < _lalitpurBoundary.length;
-      j = i++
-    ) {
+    for (int i = 0, j = _lalitpurBoundary.length - 1; i < _lalitpurBoundary.length; j = i++) {
       if (((_lalitpurBoundary[i].latitude > point.latitude) !=
               (_lalitpurBoundary[j].latitude > point.latitude)) &&
           (point.longitude <
-              (_lalitpurBoundary[j].longitude -
-                          _lalitpurBoundary[i].longitude) *
+              (_lalitpurBoundary[j].longitude - _lalitpurBoundary[i].longitude) *
                       (point.latitude - _lalitpurBoundary[i].latitude) /
-                      (_lalitpurBoundary[j].latitude -
-                          _lalitpurBoundary[i].latitude) +
+                      (_lalitpurBoundary[j].latitude - _lalitpurBoundary[i].latitude) +
                   _lalitpurBoundary[i].longitude)) {
         inside = !inside;
       }
@@ -72,18 +66,13 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _loadUserProfile() async {
     final userData = await _secureStorage.readUser();
-    debugPrint("🔍 SecureStorage returned user: $userData");
-
     if (userData != null) {
       final json = jsonDecode(userData);
       final user = UserProfile.fromJson(json);
       setState(() {
         _userProfile = user;
       });
-
       OtpSocketService().connect(user.id, context: context);
-    } else {
-      debugPrint("⚠️ No user found in secure storage.");
     }
   }
 
@@ -94,28 +83,20 @@ class _MapScreenState extends State<MapScreen> {
         _stations.clear();
         _stations.addAll(stations);
       });
-
-      if (stations.isEmpty && mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('No stations found')));
-      }
     } catch (e) {
       debugPrint('❌ Error fetching stations: $e');
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error fetching stations: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error fetching stations: $e')),
+        );
       }
     }
   }
 
   Future<void> _initLocation() async {
     bool serviceEnabled = await _location.serviceEnabled();
-    if (!serviceEnabled) {
-      serviceEnabled = await _location.requestService();
-      if (!serviceEnabled) return;
-    }
+    if (!serviceEnabled) serviceEnabled = await _location.requestService();
+    if (!serviceEnabled) return;
 
     PermissionStatus permissionGranted = await _location.hasPermission();
     if (permissionGranted == PermissionStatus.denied) {
@@ -132,21 +113,9 @@ class _MapScreenState extends State<MapScreen> {
           point: newLocation,
           width: 60,
           height: 60,
-          child: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.blue,
-              border: Border.all(color: Colors.white, width: 3),
-            ),
-            child: const Icon(
-              Icons.person_pin_circle,
-              color: Colors.white,
-              size: 32,
-            ),
-          ),
+          child: const Icon(Icons.person_pin_circle, color: Colors.blue, size: 36),
         );
       });
-
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _mapController.move(newLocation, 15);
       });
@@ -161,18 +130,7 @@ class _MapScreenState extends State<MapScreen> {
             point: updatedLocation,
             width: 60,
             height: 60,
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.blue,
-                border: Border.all(color: Colors.white, width: 3),
-              ),
-              child: const Icon(
-                Icons.person_pin_circle,
-                color: Colors.white,
-                size: 32,
-              ),
-            ),
+            child: const Icon(Icons.person_pin_circle, color: Colors.blue, size: 36),
           );
         });
 
@@ -181,7 +139,7 @@ class _MapScreenState extends State<MapScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('⚠️ You are outside the allowed area!'),
-                backgroundColor: Colors.redAccent,
+                backgroundColor: Colors.red,
               ),
             );
           }
@@ -211,34 +169,32 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _onStationTap(Station station) async {
-    if (_userProfile != null) {
-      final LatLng? result = await showModalBottomSheet<LatLng>(
-        context: context,
-        isScrollControlled: true,
-        builder: (_) => SafeArea(
-          child: Container(
-            color: Colors.white,
-            child: buildStationBottomSheet(
-              context,
-              station,
-              _userProfile!,
-              onUnlockSuccess: (LatLng bikeLocation) {
-                if (_currentLocation != null) {
-                  _fetchRoute(_currentLocation!, bikeLocation);
-                }
-              },
-            ),
-          ),
-        ),
+    if (_userProfile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("User not logged in.")),
       );
+      return;
+    }
 
-      if (result != null && _currentLocation != null) {
-        _fetchRoute(_currentLocation!, result);
-      }
-    } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("User not logged in.")));
+    final LatLng? result = await showModalBottomSheet<LatLng>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => SafeArea(
+        child: buildStationBottomSheet(
+          context,
+          station,
+          _userProfile!,
+          onUnlockSuccess: (LatLng bikeLocation) {
+            if (_currentLocation != null) {
+              _fetchRoute(_currentLocation!, bikeLocation);
+            }
+          },
+        ),
+      ),
+    );
+
+    if (result != null && _currentLocation != null) {
+      _fetchRoute(_currentLocation!, result);
     }
   }
 

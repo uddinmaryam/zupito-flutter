@@ -193,13 +193,13 @@ class _BikeCardState extends State<_BikeCard> {
               );
               if (verify.statusCode == 200) {
                 if (!mounted) return;
-                Navigator.of(context).pop(); // Close OTP dialog first
+                Navigator.of(context).pop();
 
-                Future.delayed(Duration.zero, () {
+                Future.delayed(const Duration(milliseconds: 300), () {
                   if (!mounted) return;
-                  Navigator.of(context).pop(
-                    LatLng(widget.bike.lat, widget.bike.lng),
-                  ); // Close bottom sheet
+                  Navigator.of(
+                    context,
+                  ).pop(LatLng(widget.bike.lat, widget.bike.lng));
                   widget.onRefresh();
                   widget.onUnlockSuccess?.call(
                     LatLng(widget.bike.lat, widget.bike.lng),
