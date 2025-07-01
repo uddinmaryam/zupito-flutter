@@ -6,12 +6,11 @@ import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
 
 import '../../models/station.dart';
-import '../../models/bike.dart';
 import '../../models/user.dart';
 import '../../../services/station_service.dart';
 import '../../../services/secure_storage_services.dart';
-import '../../../services/otp_socket_service.dart'; // ✅ Add this line
-import 'widgets/station_bottom_sheet.dart'; // ✅ Use only this import
+import '../../../services/otp_socket_service.dart';
+import 'widgets/station_bottom_sheet.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -27,6 +26,7 @@ class _MapScreenState extends State<MapScreen> {
   Marker? _currentLocationMarker;
   final List<Station> _stations = [];
   final SecureStorageService _secureStorage = SecureStorageService();
+  final List<LatLng> _routePoints = [];
 
   final List<LatLng> _lalitpurBoundary = [
     LatLng(27.6912, 85.3127),
@@ -81,7 +81,6 @@ class _MapScreenState extends State<MapScreen> {
         _userProfile = user;
       });
 
-      // ✅ Correct place to connect
       OtpSocketService().connect(user.id, context: context);
     } else {
       debugPrint("⚠️ No user found in secure storage.");
@@ -191,9 +190,51 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  void _onStationTap(Station station) {
+  Future<void> _fetchRoute(LatLng start, LatLng end) async {
+    final url = Uri.parse(
+      'http://router.project-osrm.org/route/v1/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?overview=full&geometries=geojson',
+    );
+
+    final response = await http.get(url);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final coords = data['routes'][0]['geometry']['coordinates'];
+      final points = coords.map<LatLng>((c) => LatLng(c[1], c[0])).toList();
+
+      setState(() {
+        _routePoints.clear();
+        _routePoints.addAll(points);
+      });
+    } else {
+      debugPrint('❌ Failed to fetch route: ${response.body}');
+    }
+  }
+
+  void _onStationTap(Station station) async {
     if (_userProfile != null) {
-      showStationBottomSheet(context, station, _userProfile!);
+      final LatLng? result = await showModalBottomSheet<LatLng>(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) => SafeArea(
+          child: Container(
+            color: Colors.white,
+            child: buildStationBottomSheet(
+              context,
+              station,
+              _userProfile!,
+              onUnlockSuccess: (LatLng bikeLocation) {
+                if (_currentLocation != null) {
+                  _fetchRoute(_currentLocation!, bikeLocation);
+                }
+              },
+            ),
+          ),
+        ),
+      );
+
+      if (result != null && _currentLocation != null) {
+        _fetchRoute(_currentLocation!, result);
+      }
     } else {
       ScaffoldMessenger.of(
         context,
@@ -232,6 +273,12 @@ class _MapScreenState extends State<MapScreen> {
                       color: Colors.red,
                       isDotted: true,
                     ),
+                    if (_routePoints.isNotEmpty)
+                      Polyline(
+                        points: _routePoints,
+                        strokeWidth: 4.0,
+                        color: Colors.indigo,
+                      ),
                   ],
                 ),
                 MarkerLayer(

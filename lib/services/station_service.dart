@@ -11,13 +11,22 @@ class StationService {
     final response = await http.get(url);
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body); // ✅ Now it's a Map
-      final stations = (data['stations'] as List)
-          .map((json) => Station.fromJson(json))
-          .toList();
+      final data = jsonDecode(response.body);
+
+      // ✅ Safely map each station
+      final stations = (data['stations'] as List).map((stationJson) {
+        // Debug log bike codes to verify they are not null
+        final bikes = (stationJson['bikes'] as List?) ?? [];
+        for (var bike in bikes) {
+          print("📦 Bike received: ${bike['name']} - Code: ${bike['code']}");
+        }
+
+        return Station.fromJson(stationJson);
+      }).toList();
+
       return stations;
     } else {
-      print('Error ${response.statusCode}: ${response.body}');
+      print('❌ Error ${response.statusCode}: ${response.body}');
       throw Exception('Failed to load stations');
     }
   }
