@@ -1,3 +1,5 @@
+// UPDATED map_screen.dart with success message and distance display
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -42,13 +44,19 @@ class _MapScreenState extends State<MapScreen> {
 
   bool isInsideLalitpur(LatLng point) {
     bool inside = false;
-    for (int i = 0, j = _lalitpurBoundary.length - 1; i < _lalitpurBoundary.length; j = i++) {
+    for (
+      int i = 0, j = _lalitpurBoundary.length - 1;
+      i < _lalitpurBoundary.length;
+      j = i++
+    ) {
       if (((_lalitpurBoundary[i].latitude > point.latitude) !=
               (_lalitpurBoundary[j].latitude > point.latitude)) &&
           (point.longitude <
-              (_lalitpurBoundary[j].longitude - _lalitpurBoundary[i].longitude) *
+              (_lalitpurBoundary[j].longitude -
+                          _lalitpurBoundary[i].longitude) *
                       (point.latitude - _lalitpurBoundary[i].latitude) /
-                      (_lalitpurBoundary[j].latitude - _lalitpurBoundary[i].latitude) +
+                      (_lalitpurBoundary[j].latitude -
+                          _lalitpurBoundary[i].latitude) +
                   _lalitpurBoundary[i].longitude)) {
         inside = !inside;
       }
@@ -72,6 +80,7 @@ class _MapScreenState extends State<MapScreen> {
       setState(() {
         _userProfile = user;
       });
+      // ignore: use_build_context_synchronously
       OtpSocketService().connect(user.id, context: context);
     }
   }
@@ -86,9 +95,9 @@ class _MapScreenState extends State<MapScreen> {
     } catch (e) {
       debugPrint('❌ Error fetching stations: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching stations: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error fetching stations: $e')));
       }
     }
   }
@@ -113,7 +122,11 @@ class _MapScreenState extends State<MapScreen> {
           point: newLocation,
           width: 60,
           height: 60,
-          child: const Icon(Icons.person_pin_circle, color: Colors.blue, size: 36),
+          child: const Icon(
+            Icons.person_pin_circle,
+            color: Colors.blue,
+            size: 36,
+          ),
         );
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -130,25 +143,30 @@ class _MapScreenState extends State<MapScreen> {
             point: updatedLocation,
             width: 60,
             height: 60,
-            child: const Icon(Icons.person_pin_circle, color: Colors.blue, size: 36),
+            child: const Icon(
+              Icons.person_pin_circle,
+              color: Colors.blue,
+              size: 36,
+            ),
           );
         });
 
-        if (!isInsideLalitpur(updatedLocation)) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('⚠️ You are outside the allowed area!'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
+        // if (!isInsideLalitpur(updatedLocation)) {
+        // if (mounted) {
+        // ScaffoldMessenger.of(context).showSnackBar(
+        // const SnackBar(
+        // content: Text('⚠️ You are outside the allowed area!'),
+        //backgroundColor: Colors.red,
+        //),
+        // );
+        // }
+        // }
       }
     });
   }
 
   Future<void> _fetchRoute(LatLng start, LatLng end) async {
+    print("📍 Fetching route from $start to $end");
     final url = Uri.parse(
       'http://router.project-osrm.org/route/v1/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?overview=full&geometries=geojson',
     );
@@ -158,6 +176,7 @@ class _MapScreenState extends State<MapScreen> {
       final data = jsonDecode(response.body);
       final coords = data['routes'][0]['geometry']['coordinates'];
       final points = coords.map<LatLng>((c) => LatLng(c[1], c[0])).toList();
+      print("✅ Route fetched: ${points.length} points");
 
       setState(() {
         _routePoints.clear();
@@ -170,9 +189,9 @@ class _MapScreenState extends State<MapScreen> {
 
   void _onStationTap(Station station) async {
     if (_userProfile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("User not logged in.")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("User not logged in.")));
       return;
     }
 
@@ -185,8 +204,25 @@ class _MapScreenState extends State<MapScreen> {
           station,
           _userProfile!,
           onUnlockSuccess: (LatLng bikeLocation) {
+            print("🚲 Bike unlocked at $bikeLocation");
             if (_currentLocation != null) {
               _fetchRoute(_currentLocation!, bikeLocation);
+
+              final Distance distance = const Distance();
+              final double meters = distance.as(
+                LengthUnit.Meter,
+                _currentLocation!,
+                bikeLocation,
+              );
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    "✅ Bike unlocked!\n📍 Distance to station: \${(meters / 1000).toStringAsFixed(2)} km",
+                  ),
+                  duration: const Duration(seconds: 4),
+                ),
+              );
             }
           },
         ),
@@ -232,8 +268,8 @@ class _MapScreenState extends State<MapScreen> {
                     if (_routePoints.isNotEmpty)
                       Polyline(
                         points: _routePoints,
-                        strokeWidth: 4.0,
-                        color: Colors.indigo,
+                        strokeWidth: 5.0,
+                        color: Colors.green,
                       ),
                   ],
                 ),
