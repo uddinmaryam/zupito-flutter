@@ -54,7 +54,6 @@ void showStationBottomSheet(
                 child: Text(station.description),
               ),
             const SizedBox(height: 20),
-
             Text(
               'Available Bikes (${availableBikes.length})',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -69,7 +68,6 @@ void showStationBottomSheet(
                 }).toList(),
               ),
             const SizedBox(height: 20),
-
             Text(
               'Unavailable Bikes (${unavailableBikes.length})',
               style: const TextStyle(
@@ -88,7 +86,6 @@ void showStationBottomSheet(
                 }).toList(),
               ),
             const SizedBox(height: 24),
-
             Center(
               child: ElevatedButton.icon(
                 onPressed: () => Navigator.pop(context),
@@ -136,7 +133,6 @@ class _BikeCardState extends State<_BikeCard> {
     }
 
     try {
-      // ✅ STEP 1: Send userId to generate OTP
       final otpGen = await http.post(
         Uri.parse('https://backend-bicycle-1.onrender.com/api/v1/otp/generate'),
         headers: {'Content-Type': 'application/json'},
@@ -144,10 +140,18 @@ class _BikeCardState extends State<_BikeCard> {
       );
 
       if (otpGen.statusCode == 200) {
-        // ✅ Now the OTP will come via WebSocket, not from here
-        await showUnlockNotification(widget.bike.name);
+        Future<void> showUnlockNotification(String name) async {
+          print("📢 Unlock attempt for bike: $name");
 
-        // Show dialog to enter OTP manually (from notification or WebSocket message)
+          // Optional: Show a visual top overlay or snack bar
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("📢 Unlock request sent for $name."),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+
         await showDialog(
           context: context,
           barrierDismissible: false,
@@ -161,20 +165,32 @@ class _BikeCardState extends State<_BikeCard> {
                 body: jsonEncode({'code': widget.bike.code, 'otp': enteredOtp}),
               );
 
-              if (verify.statusCode == 200 &&
-                  jsonDecode(verify.body)['success'] == true) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text("✅ OTP verified. Bike unlocked."),
-                  ),
-                );
-                setState(() {
-                  widget.bike.isUnlocked = true;
-                  widget.bike.isAvailable = false;
-                });
+              if (verify.statusCode == 200) {
+                final body = jsonDecode(verify.body);
+                print("✅ OTP Verify Response: $body");
+
+                if (body['success'] == true) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("✅ OTP verified. Bike unlocked."),
+                    ),
+                  );
+                  setState(() {
+                    widget.bike.isUnlocked = true;
+                    widget.bike.isAvailable = false;
+                  });
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("❌ ${body['message'] ?? 'Invalid OTP'}"),
+                    ),
+                  );
+                }
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("❌ Incorrect or expired OTP.")),
+                  SnackBar(
+                    content: Text("❌ Server error: ${verify.statusCode}"),
+                  ),
                 );
               }
             },

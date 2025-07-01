@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import '../utils/top_notification.dart'; // ✅ Custom notification
 
 class OtpSocketService {
   static final OtpSocketService _instance = OtpSocketService._internal();
@@ -36,19 +37,7 @@ class OtpSocketService {
       print("🔐 OTP received: $otp for bike $bike");
 
       if (_context != null) {
-        showDialog(
-          context: _context!,
-          builder: (ctx) => AlertDialog(
-            title: const Text("🔐 OTP Received"),
-            content: Text("Your OTP for $bike is: $otp"),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text("OK"),
-              ),
-            ],
-          ),
-        );
+        showTopNotification(_context!, "🔐 OTP for $bike: $otp");
       }
     });
 

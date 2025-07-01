@@ -66,7 +66,7 @@ class _LoginScreenState extends State<LoginScreen>
         final userId = result['user']['_id'] ?? result['user']['id'];
         if (userId != null) {
           print('📡 Connecting socket for userId: $userId');
-          OtpSocketService().connect(userId, context: context);
+          
         } else {
           print('⚠️ No userId found in login response');
         }
