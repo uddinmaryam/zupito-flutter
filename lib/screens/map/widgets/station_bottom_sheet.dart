@@ -182,7 +182,7 @@ class _BikeCardState extends State<_BikeCard> {
         await showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (_) => _OTPDialog(
+          builder: (dialogContext) => _OTPDialog(
             onSubmit: (enteredOtp) async {
               final verify = await http.post(
                 Uri.parse(
@@ -191,19 +191,20 @@ class _BikeCardState extends State<_BikeCard> {
                 headers: {'Content-Type': 'application/json'},
                 body: jsonEncode({'code': widget.bike.code, 'otp': enteredOtp}),
               );
+
               if (verify.statusCode == 200) {
                 if (!mounted) return;
-                Navigator.of(context).pop();
 
-                Future.delayed(const Duration(milliseconds: 300), () {
+                print("✅ OTP verified!");
+                Navigator.of(dialogContext).pop(); // Close OTP dialog
+                print("📤 OTP dialog closed");
+
+                Future.microtask(() {
                   if (!mounted) return;
+                  print("📤 Returning bike location to MapScreen...");
                   Navigator.of(
                     context,
                   ).pop(LatLng(widget.bike.lat, widget.bike.lng));
-                  widget.onRefresh();
-                  widget.onUnlockSuccess?.call(
-                    LatLng(widget.bike.lat, widget.bike.lng),
-                  );
                 });
               } else {
                 final error = jsonDecode(verify.body);

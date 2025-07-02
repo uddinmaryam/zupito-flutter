@@ -1,5 +1,3 @@
-// UPDATED map_screen.dart with success message and distance display
-
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -80,7 +78,6 @@ class _MapScreenState extends State<MapScreen> {
       setState(() {
         _userProfile = user;
       });
-      // ignore: use_build_context_synchronously
       OtpSocketService().connect(user.id, context: context);
     }
   }
@@ -150,38 +147,28 @@ class _MapScreenState extends State<MapScreen> {
             ),
           );
         });
-
-        // if (!isInsideLalitpur(updatedLocation)) {
-        // if (mounted) {
-        // ScaffoldMessenger.of(context).showSnackBar(
-        // const SnackBar(
-        // content: Text('⚠️ You are outside the allowed area!'),
-        //backgroundColor: Colors.red,
-        //),
-        // );
-        // }
-        // }
       }
     });
   }
 
   Future<void> _fetchRoute(LatLng start, LatLng end) async {
-    print("📍 Fetching route from $start to $end");
+    print("🌍 Calling OSRM for route...");
     final url = Uri.parse(
       'http://router.project-osrm.org/route/v1/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?overview=full&geometries=geojson',
     );
 
     final response = await http.get(url);
+    print("📨 OSRM response: ${response.statusCode}");
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final coords = data['routes'][0]['geometry']['coordinates'];
       final points = coords.map<LatLng>((c) => LatLng(c[1], c[0])).toList();
-      print("✅ Route fetched: ${points.length} points");
-
       setState(() {
         _routePoints.clear();
         _routePoints.addAll(points);
       });
+      print("✅ Route points loaded: ${_routePoints.length} points");
     } else {
       debugPrint('❌ Failed to fetch route: ${response.body}');
     }
@@ -195,42 +182,36 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
 
-    final LatLng? result = await showModalBottomSheet<LatLng>(
+    final LatLng? bikeLocation = await showModalBottomSheet<LatLng>(
       context: context,
       isScrollControlled: true,
       builder: (_) => SafeArea(
-        child: buildStationBottomSheet(
-          context,
-          station,
-          _userProfile!,
-          onUnlockSuccess: (LatLng bikeLocation) {
-            print("🚲 Bike unlocked at $bikeLocation");
-            if (_currentLocation != null) {
-              _fetchRoute(_currentLocation!, bikeLocation);
-
-              final Distance distance = const Distance();
-              final double meters = distance.as(
-                LengthUnit.Meter,
-                _currentLocation!,
-                bikeLocation,
-              );
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    "✅ Bike unlocked!\n📍 Distance to station: \${(meters / 1000).toStringAsFixed(2)} km",
-                  ),
-                  duration: const Duration(seconds: 4),
-                ),
-              );
-            }
-          },
-        ),
+        child: buildStationBottomSheet(context, station, _userProfile!),
       ),
     );
 
-    if (result != null && _currentLocation != null) {
-      _fetchRoute(_currentLocation!, result);
+    print("📍 Received bikeLocation: $bikeLocation");
+
+    if (bikeLocation != null && _currentLocation != null) {
+      _fetchRoute(_currentLocation!, bikeLocation);
+
+      final Distance distance = const Distance();
+      final double meters = distance.as(
+        LengthUnit.Meter,
+        _currentLocation!,
+        bikeLocation,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "✅ Bike unlocked!\n📍 Distance to station: ${(meters / 1000).toStringAsFixed(2)} km",
+          ),
+          duration: const Duration(seconds: 10),
+        ),
+      );
+    } else {
+      print("⚠️ bikeLocation or currentLocation is null");
     }
   }
 
