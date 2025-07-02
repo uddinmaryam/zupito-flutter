@@ -4,7 +4,7 @@ import 'package:zupito/screens/map/map_screen.dart';
 import '../services/auth_service.dart';
 import '../services/secure_storage_services.dart';
 import 'signup_screen.dart';
-import '../services/otp_socket_service.dart'; // ✅ Socket Service Import
+import '../services/otp_socket_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -56,21 +56,17 @@ class _LoginScreenState extends State<LoginScreen>
     try {
       final result = await authService.login(username, password);
 
-      if (result != null &&
-          result is Map<String, dynamic> &&
-          result['token'] != null &&
-          result['user'] != null) {
+      if (result != null && result['token'] != null && result['user'] != null) {
         await _secureStorage.saveToken(result['token']);
         await _secureStorage.saveUser(jsonEncode(result['user']));
 
         final userId = result['user']['_id'] ?? result['user']['id'];
         if (userId != null) {
           print('📡 Connecting socket for userId: $userId');
-          
-        } else {
-          print('⚠️ No userId found in login response');
+          OtpSocketService().connect(userId, context: context);
         }
 
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const MapScreen()),
@@ -131,7 +127,10 @@ class _LoginScreenState extends State<LoginScreen>
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _handleUsernamePasswordLogin,
+                      onPressed: () {
+                        print("✅ Button pressed");
+                        _handleUsernamePasswordLogin();
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.indigo,
                         padding: const EdgeInsets.symmetric(vertical: 14),

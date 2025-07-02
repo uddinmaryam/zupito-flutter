@@ -18,8 +18,10 @@ class StationService {
         // Debug log bike codes to verify they are not null
         final bikes = (stationJson['bikes'] as List?) ?? [];
         for (var bike in bikes) {
-          print("📦 Bike received: ${bike['name']} - Code: ${bike['code']}");
-        }
+  print("📦 Bike JSON: ${jsonEncode(bike)}");
+}
+
+        
 
         return Station.fromJson(stationJson);
       }).toList();

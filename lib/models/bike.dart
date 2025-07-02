@@ -27,8 +27,8 @@ class Bike {
       code: json['code'] ?? '',
       id: json['_id'] ?? '',
       name: json['name'] ?? json['code'], // fallback to code
-      lat: (json['location']['lat'] as num).toDouble(),
-      lng: (json['location']['lng'] as num).toDouble(),
+      lat: (json['location']['lat'] as num).toDouble() ?? 0.0,
+      lng: (json['location']['lng'] as num).toDouble() ?? 0.0,
       pricePerMinute: (json['pricePerMinute'] as num?)?.toDouble() ?? 0.0,
       isAvailable: json['isAvailable'] ?? false,
       availableInMinutes: json['availableInMinutes'] as int?,

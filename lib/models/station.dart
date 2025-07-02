@@ -24,10 +24,21 @@ class Station {
       lat: (json['latitude'] as num).toDouble(),
       lng: (json['longitude'] as num).toDouble(),
       bikes: (json['bikes'] as List<dynamic>? ?? [])
-          .map((bike) => Bike.fromJson(bike))
+          .map((bikeJson) => Bike.fromJson(bikeJson))
           .toList(),
       description: json['description'] ?? '',
     );
+  }
+
+  // ✅ CONFIRMED: Correctly calculates the number of available bikes
+  // This uses the 'isAvailable' property from your Bike model.
+  int get availableBikes {
+    return bikes.where((bike) => bike.isAvailable).length;
+  }
+
+  // You can also add a getter for unavailable bikes if needed for other logic
+  int get unavailableBikes {
+    return bikes.where((bike) => !bike.isAvailable).length;
   }
 
   Map<String, dynamic> toJson() {
