@@ -249,11 +249,12 @@ class _BikeCardState extends State<_BikeCard> {
       final userJson = await SecureStorageService().readUser();
       final userId = userJson != null ? jsonDecode(userJson)['_id'] : null;
       if (userId == null) throw Exception("User not found");
-
       final response = await _apiService.startRide(
+        userId: userId,
         bikeId: bike.id,
         selectedDuration: duration,
-        userId: userId,
+        startLat: bike.lat ?? 0.0, // replace with actual values if needed
+        startLng: bike.lng ?? 0.0,
       );
 
       if (response['success'] == true) {

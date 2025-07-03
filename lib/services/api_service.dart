@@ -22,13 +22,16 @@ class ApiService {
 
   // Existing methods (e.g., unlockBike) can go here
 
-  // ✅ NEW: startRide method
   Future<Map<String, dynamic>> startRide({
-    required String userId, // Added userId as a requirement
+    required String userId,
     required String bikeId,
     required int selectedDuration,
+    required double startLat,
+    required double startLng,
   }) async {
-    final url = Uri.parse('$_baseUrl/ride/start'); // Your backend endpoint
+    final double estimatedCost = selectedDuration * 2.0; // Rs. 2 per minute
+
+    final url = Uri.parse('$_baseUrl/ride/start');
     try {
       final response = await http.post(
         url,
@@ -37,17 +40,18 @@ class ApiService {
           'userId': userId,
           'bikeId': bikeId,
           'selectedDuration': selectedDuration,
+          'estimatedCost': estimatedCost,
+          'startLat': startLat,
+          'startLng': startLng,
         }),
       );
 
-      if (response.statusCode == 200) {
-        return json.decode(
-          response.body,
-        ); // Expect success, rideId, bikeCode, rideEndTime, bikeLocation
+      if (response.statusCode == 201) {
+        return json.decode(response.body);
       } else {
         final errorBody = json.decode(response.body);
         throw Exception(
-          'Failed to start ride: ${errorBody['message'] ?? 'Unknown error'} (Status: ${response.statusCode})',
+          'Failed to start ride: ${errorBody['error'] ?? 'Unknown error'} (Status: ${response.statusCode})',
         );
       }
     } catch (e) {
