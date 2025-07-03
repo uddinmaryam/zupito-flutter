@@ -41,6 +41,8 @@ class Station {
     return bikes.where((bike) => !bike.isAvailable).length;
   }
 
+  get location => null;
+
   Map<String, dynamic> toJson() {
     return {
       '_id': id,

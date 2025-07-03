@@ -47,7 +47,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/splash.png
-
-    - assets/images/profileicon.jpg
-    - assets/images/bike_icon.avif
+    - assets/images/station_pin.jpg
     - assets/images/user_marker.png
