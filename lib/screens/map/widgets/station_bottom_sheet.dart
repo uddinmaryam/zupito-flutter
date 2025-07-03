@@ -27,6 +27,7 @@ Widget buildStationBottomSheet(
 }) {
   final BuildContext rootContext = context;
 
+
   void refreshSheet() {
     Navigator.pop(rootContext);
     showModalBottomSheet(
@@ -154,9 +155,6 @@ Widget buildStationBottomSheet(
   );
 }
 
-// ✅ You already have _BikeCard and _OTPDialog classes as per your previous code
-// You can keep those unchanged unless you want further UI improvements inside the card layout.
-
 class _BikeCard extends StatefulWidget {
   final Bike bike;
   final bool isAvailable;
@@ -166,8 +164,7 @@ class _BikeCard extends StatefulWidget {
     String rideId,
     DateTime rideEndTime,
     LatLng bikeStartLocation,
-  )?
-  onRideStartConfirmed;
+  )? onRideStartConfirmed;
 
   const _BikeCard({
     super.key,
@@ -242,51 +239,64 @@ class _BikeCardState extends State<_BikeCard> {
       },
     );
   }
-
   Future<void> _startRide(Bike bike, int duration) async {
-    setState(() => _loading = true);
-    try {
-      final userJson = await SecureStorageService().readUser();
-      final userId = userJson != null ? jsonDecode(userJson)['_id'] : null;
-      if (userId == null) throw Exception("User not found");
-      final response = await _apiService.startRide(
-        userId: userId,
-        bikeId: bike.id,
-        selectedDuration: duration,
-        startLat: bike.lat ?? 0.0, // replace with actual values if needed
-        startLng: bike.lng ?? 0.0,
+  setState(() => _loading = true);
+
+  try {
+    final userJson = await SecureStorageService().readUser();
+    final userId = userJson != null ? jsonDecode(userJson)['_id'] : null;
+    if (userId == null) throw Exception("User not found");
+
+    final double estimatedCost = duration * _pricePerMinute;
+
+    final response = await _apiService.startRide(
+      userId: userId,
+      bikeId: bike.id,
+      selectedDuration: duration,
+      estimatedCost: estimatedCost,
+      startLat: bike.lat ?? 0.0,
+      startLng: bike.lng ?? 0.0,
+    );
+
+    if (response['success'] == true) {
+      final String rideId = response['rideId'];
+      final String bikeCode = response['bikeCode'];
+      final DateTime rideEndTime = DateTime.parse(response['rideEndTime']);
+      final LatLng bikeStartLocation = LatLng(
+        response['bikeLocation']['latitude'],
+        response['bikeLocation']['longitude'],
       );
 
-      if (response['success'] == true) {
-        final String rideId = response['rideId'];
-        final String bikeCode = response['bikeCode'];
-        final DateTime rideEndTime = DateTime.parse(response['rideEndTime']);
-        final LatLng bikeStartLocation = LatLng(
-          response['bikeLocation']['latitude'],
-          response['bikeLocation']['longitude'],
+      if (widget.onRideStartConfirmed != null) {
+        await widget.onRideStartConfirmed!(
+          bikeCode,
+          rideId,
+          rideEndTime,
+          bikeStartLocation,
         );
-
-        if (widget.onRideStartConfirmed != null) {
-          await widget.onRideStartConfirmed!(
-            bikeCode,
-            rideId,
-            rideEndTime,
-            bikeStartLocation,
-          );
-        }
-
-        showTopNotification(context, "✅ Payment Successful! Ride started.");
-        Navigator.pop(context);
-      } else {
-        showTopNotification(context, "❌ ${response['message'] ?? 'Failed'}");
       }
-    } catch (e) {
-      showTopNotification(context, "❌ ${e.toString()}");
-    } finally {
+
+      showTopNotification(context, "✅ Payment Successful! Ride started.");
+
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    } else {
+      showTopNotification(context, "❌ ${response['message'] ?? 'Failed to start ride'}");
+    }
+  } catch (e) {
+    showTopNotification(context, "❌ Error: ${e.toString()}");
+  } finally {
+    if (mounted) {
       setState(() => _loading = false);
     }
   }
+}
 
+
+
+
+  
   Future<void> _handleUnlock() async {
     setState(() => _loading = true);
     try {
@@ -349,11 +359,11 @@ class _BikeCardState extends State<_BikeCard> {
         subtitle: Text('Code: ${widget.bike.code}'),
         trailing: widget.isAvailable
             ? (_loading
-                  ? const CircularProgressIndicator()
-                  : ElevatedButton(
-                      onPressed: _handleUnlock,
-                      child: const Text('Unlock'),
-                    ))
+                ? const CircularProgressIndicator()
+                : ElevatedButton(
+                    onPressed: _handleUnlock,
+                    child: const Text('Unlock'),
+                  ))
             : Text(
                 widget.bike.availableInMinutes != null
                     ? 'Unavailable (Available in ${widget.bike.availableInMinutes} mins)'

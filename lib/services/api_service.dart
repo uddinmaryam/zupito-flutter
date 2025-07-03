@@ -27,9 +27,12 @@ class ApiService {
     required String bikeId,
     required int selectedDuration,
     required double startLat,
-    required double startLng,
+    required double startLng, required double estimatedCost,
   }) async {
-    final double estimatedCost = selectedDuration * 2.0; // Rs. 2 per minute
+    
+  // NO duplicate estimatedCost inside the method
+
+     // Rs. 2 per minute
 
     final url = Uri.parse('$_baseUrl/ride/start');
     try {

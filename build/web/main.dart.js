@@ -91232,53 +91232,53 @@ return A.H(A.aCu(!1,new A.aoz(o,q,n,a),p,t.z),$async$y3)
 case 2:return A.M(null,r)}})
 return A.N($async$y3,r)},
 q_(a,b){return this.ahO(a,b)},
-ahO(a,a0){var s=0,r=A.O(t.H),q=1,p=[],o=[],n=this,m,l,k,j,i,h,g,f,e,d,c,b
-var $async$q_=A.K(function(a1,a2){if(a1===1){p.push(a2)
+ahO(a0,a1){var s=0,r=A.O(t.H),q=1,p=[],o=[],n=this,m,l,k,j,i,h,g,f,e,d,c,b,a
+var $async$q_=A.K(function(a2,a3){if(a2===1){p.push(a3)
 s=q}while(true)switch(s){case 0:n.an(new A.aoA(n))
 q=3
 s=6
 return A.H(new A.nT().r0(),$async$q_)
-case 6:m=a2
+case 6:m=a3
 l=m!=null?J.au(B.X.ld(0,m,null),"_id"):null
-if(l==null){e=A.db("User not found")
-throw A.e(e)}s=7
-return A.H(n.e.wp(a.b,a0,a.d,a.e,l),$async$q_)
-case 7:k=a2
-s=J.d(J.au(k,"success"),!0)?8:10
+if(l==null){d=A.db("User not found")
+throw A.e(d)}k=a1*2
+s=7
+return A.H(n.e.wp(a0.b,k,a1,a0.d,a0.e,l),$async$q_)
+case 7:j=a3
+s=J.d(J.au(j,"success"),!0)?8:10
 break
-case 8:j=J.au(k,"rideId")
-i=J.au(k,"bikeCode")
-h=A.aEk(J.au(k,"rideEndTime"))
-g=new A.cu(J.au(J.au(k,"bikeLocation"),"latitude"),J.au(J.au(k,"bikeLocation"),"longitude"))
+case 8:i=J.au(j,"rideId")
+h=J.au(j,"bikeCode")
+g=A.aEk(J.au(j,"rideEndTime"))
+f=new A.cu(J.au(J.au(j,"bikeLocation"),"latitude"),J.au(J.au(j,"bikeLocation"),"longitude"))
 s=11
-return A.H(n.a.f.$4(i,j,h,g),$async$q_)
-case 11:e=n.c
-e.toString
-A.t2(e,"\u2705 Payment Successful! Ride started.")
-e=n.c
-e.toString
-A.dz(e,!1).ky(0,null)
+return A.H(n.a.f.$4(h,i,g,f),$async$q_)
+case 11:d=n.c
+d.toString
+A.t2(d,"\u2705 Payment Successful! Ride started.")
+d=n.c
+if(d!=null)A.dz(d,!1).ky(0,null)
 s=9
 break
-case 10:e=n.c
-e.toString
-d=J.au(k,"message")
-A.t2(e,"\u274c "+A.k(d==null?"Failed":d))
+case 10:d=n.c
+d.toString
+c=J.au(j,"message")
+A.t2(d,"\u274c "+A.k(c==null?"Failed to start ride":c))
 case 9:o.push(5)
 s=4
 break
 case 3:q=2
-b=p.pop()
-f=A.a6(b)
-e=n.c
-e.toString
-A.t2(e,"\u274c "+J.cS(f))
+a=p.pop()
+e=A.a6(a)
+d=n.c
+d.toString
+A.t2(d,"\u274c Error: "+J.cS(e))
 o.push(5)
 s=4
 break
 case 2:o=[1]
 case 4:q=1
-n.an(new A.aoB(n))
+if(n.c!=null)n.an(new A.aoB(n))
 s=o.pop()
 break
 case 5:return A.M(null,r)
@@ -91565,15 +91565,14 @@ O7(){var s=t.N
 s=A.t(s,s)
 s.m(0,"Content-Type","application/json")
 return s},
-wp(a,b,c,d,e){return this.a_G(a,b,c,d,e)},
-a_G(a,b,c,d,e){var s=0,r=A.O(t.a),q,p=2,o=[],n=this,m,l,k,j,i,h,g,f
+wp(a,b,c,d,e,f){return this.a_G(a,b,c,d,e,f)},
+a_G(a,b,c,d,e,f){var s=0,r=A.O(t.a),q,p=2,o=[],n=this,m,l,k,j,i,h,g
 var $async$wp=A.K(function(a0,a1){if(a0===1){o.push(a1)
-s=p}while(true)switch(s){case 0:h=b*2
-g=A.dD("https://backend-bicycle-1.onrender.com/api/ride/start")
+s=p}while(true)switch(s){case 0:h=A.dD("https://backend-bicycle-1.onrender.com/api/ride/start")
 p=4
 j=n.O7()
 s=7
-return A.H(A.Iz(g,B.X.iP(A.Z(["userId",e,"bikeId",a,"selectedDuration",b,"estimatedCost",h,"startLat",c,"startLng",d],t.N,t.K)),j),$async$wp)
+return A.H(A.Iz(h,B.X.iP(A.Z(["userId",f,"bikeId",a,"selectedDuration",c,"estimatedCost",b,"startLat",d,"startLng",e],t.N,t.K)),j),$async$wp)
 case 7:m=a1
 if(m.b===201){j=m
 j=B.X.c3(0,A.iE(A.iB(j.e)).c3(0,j.w))
@@ -91587,8 +91586,8 @@ throw A.e(j)}p=2
 s=6
 break
 case 4:p=3
-f=o.pop()
-k=A.a6(f)
+g=o.pop()
+k=A.a6(g)
 j=A.db("Error calling startRide API: "+A.k(k))
 throw A.e(j)
 s=6
