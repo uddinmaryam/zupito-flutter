@@ -1,4 +1,4 @@
-// ✅ Premium UI/UX Enhanced `station_bottom_sheet.dart`
+// ✅ Fully Fixed and Updated station_bottom_sheet.dart
 
 import 'dart:async';
 import 'dart:convert';
@@ -26,7 +26,6 @@ Widget buildStationBottomSheet(
   onRideStartConfirmed,
 }) {
   final BuildContext rootContext = context;
-
 
   void refreshSheet() {
     Navigator.pop(rootContext);
@@ -164,7 +163,8 @@ class _BikeCard extends StatefulWidget {
     String rideId,
     DateTime rideEndTime,
     LatLng bikeStartLocation,
-  )? onRideStartConfirmed;
+  )?
+  onRideStartConfirmed;
 
   const _BikeCard({
     super.key,
@@ -182,6 +182,8 @@ class _BikeCardState extends State<_BikeCard> {
   bool _loading = false;
   final ApiService _apiService = ApiService();
   static const double _pricePerMinute = 2.0;
+
+  Map<String, String> get _jsonHeaders => {'Content-Type': 'application/json'};
 
   Future<void> _showPaymentDialog(Bike bike) async {
     final List<int> durations = [30, 45, 60, 90];
@@ -229,7 +231,7 @@ class _BikeCardState extends State<_BikeCard> {
               ElevatedButton(
                 onPressed: () async {
                   Navigator.of(ctx).pop();
-                  await _startRide(bike, selectedDuration);
+                  await _startRide(widget.bike, selectedDuration);
                 },
                 child: const Text("Pay with eSewa"),
               ),
@@ -239,74 +241,88 @@ class _BikeCardState extends State<_BikeCard> {
       },
     );
   }
+
   Future<void> _startRide(Bike bike, int duration) async {
-  setState(() => _loading = true);
+    setState(() => _loading = true);
+    try {
+      final userJson = await SecureStorageService().readUser();
+      final decoded = userJson != null ? jsonDecode(userJson) : null;
+      final String? userId = decoded != null && decoded['_id'] != null
+          ? decoded['_id'].toString()
+          : null;
 
-  try {
-    final userJson = await SecureStorageService().readUser();
-    final userId = userJson != null ? jsonDecode(userJson)['_id'] : null;
-    if (userId == null) throw Exception("User not found");
+      if (userId == null) {
+        throw Exception("❌ User ID not found in storage.");
+      }
 
-    final double estimatedCost = duration * _pricePerMinute;
+      final double estimatedCost = duration * _pricePerMinute;
 
-    final response = await _apiService.startRide(
-      userId: userId,
-      bikeId: bike.id,
-      selectedDuration: duration,
-      estimatedCost: estimatedCost,
-      startLat: bike.lat ?? 0.0,
-      startLng: bike.lng ?? 0.0,
-    );
-
-    if (response['success'] == true) {
-      final String rideId = response['rideId'];
-      final String bikeCode = response['bikeCode'];
-      final DateTime rideEndTime = DateTime.parse(response['rideEndTime']);
-      final LatLng bikeStartLocation = LatLng(
-        response['bikeLocation']['latitude'],
-        response['bikeLocation']['longitude'],
+      final response = await http.post(
+        Uri.parse('${Constants.apiUrl}/rides/start'),
+        headers: _jsonHeaders,
+        body: json.encode({
+          'userId': userId,
+          'bikeId': bike.id,
+          'selectedDuration': duration,
+          'estimatedCost': estimatedCost,
+          'startLat': bike.lat,
+          'startLng': bike.lng,
+        }),
       );
 
-      if (widget.onRideStartConfirmed != null) {
-        await widget.onRideStartConfirmed!(
-          bikeCode,
-          rideId,
-          rideEndTime,
-          bikeStartLocation,
-        );
-      }
+      if (response.statusCode == 201) {
+        final data = json.decode(response.body);
+        final String rideId = data['rideId'] ?? '';
+        final String bikeCode = bike.code ?? 'Unknown';
 
-      showTopNotification(context, "✅ Payment Successful! Ride started.");
+        final DateTime rideEndTime = data['rideEndTime'] != null
+            ? DateTime.parse(data['rideEndTime'])
+            : DateTime.now().add(Duration(minutes: duration));
 
-      if (mounted) {
+        final LatLng bikeStartLocation = data['bikeLocation'] != null
+            ? LatLng(
+                data['bikeLocation']['latitude'] ?? bike.lat,
+                data['bikeLocation']['longitude'] ?? bike.lng,
+              )
+            : LatLng(bike.lat, bike.lng);
+
+        if (widget.onRideStartConfirmed != null) {
+          await widget.onRideStartConfirmed!(
+            bikeCode,
+            rideId,
+            rideEndTime,
+            bikeStartLocation,
+          );
+        }
+
+        showTopNotification(context, "✅ Payment Successful! Ride started.");
         Navigator.pop(context);
+      } else {
+        showTopNotification(context, "❌ Failed: ${response.body}");
       }
-    } else {
-      showTopNotification(context, "❌ ${response['message'] ?? 'Failed to start ride'}");
-    }
-  } catch (e) {
-    showTopNotification(context, "❌ Error: ${e.toString()}");
-  } finally {
-    if (mounted) {
-      setState(() => _loading = false);
+    } catch (e) {
+      showTopNotification(context, "❌ Error: ${e.toString()}");
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
-}
 
-
-
-
-  
   Future<void> _handleUnlock() async {
     setState(() => _loading = true);
     try {
       final userJson = await SecureStorageService().readUser();
-      final userId = userJson != null ? jsonDecode(userJson)['_id'] : null;
-      if (userId == null) throw Exception("User not found");
+      final decoded = userJson != null ? jsonDecode(userJson) : null;
+      final String? userId = decoded != null && decoded['_id'] != null
+          ? decoded['_id'].toString()
+          : null;
+
+      if (userId == null) {
+        throw Exception("❌ User ID not found in secure storage.");
+      }
 
       final response = await http.post(
         Uri.parse('${Constants.apiUrl}/bikes/generate-otp'),
-        headers: {'Content-Type': 'application/json'},
+        headers: _jsonHeaders,
         body: jsonEncode({'bikeCode': widget.bike.code, 'userId': userId}),
       );
 
@@ -330,7 +346,7 @@ class _BikeCardState extends State<_BikeCard> {
 
         final verify = await http.post(
           Uri.parse('${Constants.apiUrl}/bikes/verify-otp'),
-          headers: {'Content-Type': 'application/json'},
+          headers: _jsonHeaders,
           body: jsonEncode({'code': widget.bike.code, 'otp': enteredOtp}),
         );
 
@@ -347,7 +363,7 @@ class _BikeCardState extends State<_BikeCard> {
     } catch (e) {
       showTopNotification(context, "❌ ${e.toString()}");
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -356,14 +372,14 @@ class _BikeCardState extends State<_BikeCard> {
     return Card(
       child: ListTile(
         title: Text(widget.bike.name ?? 'Bike'),
-        subtitle: Text('Code: ${widget.bike.code}'),
+        subtitle: Text('Code: ${widget.bike.code ?? 'N/A'}'),
         trailing: widget.isAvailable
             ? (_loading
-                ? const CircularProgressIndicator()
-                : ElevatedButton(
-                    onPressed: _handleUnlock,
-                    child: const Text('Unlock'),
-                  ))
+                  ? const CircularProgressIndicator()
+                  : ElevatedButton(
+                      onPressed: _handleUnlock,
+                      child: const Text('Unlock'),
+                    ))
             : Text(
                 widget.bike.availableInMinutes != null
                     ? 'Unavailable (Available in ${widget.bike.availableInMinutes} mins)'

@@ -1,17 +1,17 @@
 class Bike {
-  final String code;
+  final String? code;
   final String id;
   final String name;
   final double lat;
   final double lng;
   final double pricePerMinute;
   bool isAvailable;
-  
+
   final int? availableInMinutes;
   bool isUnlocked;
 
   Bike({
-    required this.code,
+    this.code,
     required this.id,
     required this.name,
     required this.lat,
@@ -27,8 +27,9 @@ class Bike {
       code: json['code'] ?? '',
       id: json['_id'] ?? '',
       name: json['name'] ?? json['code'], // fallback to code
-      lat: (json['location']['lat'] as num).toDouble() ?? 0.0,
-      lng: (json['location']['lng'] as num).toDouble() ?? 0.0,
+      lat: (json['location']?['lat'] as num?)?.toDouble() ?? 0.0,
+      lng: (json['location']?['lng'] as num?)?.toDouble() ?? 0.0,
+
       pricePerMinute: (json['pricePerMinute'] as num?)?.toDouble() ?? 0.0,
       isAvailable: json['isAvailable'] ?? false,
       availableInMinutes: json['availableInMinutes'] as int?,

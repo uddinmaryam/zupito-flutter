@@ -27,14 +27,14 @@ class ApiService {
     required String bikeId,
     required int selectedDuration,
     required double startLat,
-    required double startLng, required double estimatedCost,
+    required double startLng,
+    required double estimatedCost,
   }) async {
-    
-  // NO duplicate estimatedCost inside the method
+    // NO duplicate estimatedCost inside the method
 
-     // Rs. 2 per minute
+    // Rs. 2 per minute
 
-    final url = Uri.parse('$_baseUrl/ride/start');
+    final url = Uri.parse('$_baseUrl/rides/start');
     try {
       final response = await http.post(
         url,
@@ -67,7 +67,7 @@ class ApiService {
     required String rideId,
     required LatLng userLocation,
   }) async {
-    final url = Uri.parse('$_baseUrl/ride/end'); // Your backend endpoint
+    final url = Uri.parse('$_baseUrl/rides/end'); // Your backend endpoint
     try {
       final response = await http.post(
         url,
