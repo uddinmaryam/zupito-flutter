@@ -16,7 +16,10 @@ import 'package:zupito/services/api_service.dart';
 import 'package:zupito/services/otp_socket_service.dart';
 import 'package:zupito/services/secure_storage_services.dart';
 import 'package:zupito/services/station_service.dart';
-import 'widgets/station_bottom_sheet.dart';
+import 'widgets/station_bottom_sheet.dart'; // Ensure this path is correct
+
+// For distance calculations
+import 'package:latlong2/latlong.dart' as ltl;
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -30,8 +33,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   late Animation<double> _rippleAnimation;
 
   LatLng? _currentLocation;
-  List<LatLng> _rideRoute = [];
-  int _routeIndex = 0;
   final MapController _mapController = MapController();
   final Location _location = Location();
   final List<Station> _stations = [];
@@ -39,28 +40,34 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   final SecureStorageService _secureStorage = SecureStorageService();
 
   UserProfile? _userProfile;
-  Marker? _currentLocationMarker;
+  Marker?
+  _currentLocationMarker; // This marker is used for the user's actual location
   Timer? _stationRefreshTimer;
 
   bool _isRideActive = false;
   String? _activeBikeCode;
   String? _activeRideId;
-  LatLng? _activeBikeStartLocation;
+  LatLng?
+  _activeBikeLocation; // This represents the *bike's* current position during a free-roam ride
   DateTime? _rideEndTime;
   Duration _remainingRideTime = Duration.zero;
   Timer? _rideCountdownTimer;
   Timer? _dummyBikeMovementTimer;
   final Random _random = Random();
 
+  // Define Lalitpur Boundary (approximate polygon)
   final List<LatLng> _lalitpurBoundary = [
-    LatLng(27.6912, 85.3127),
-    LatLng(27.6815, 85.3293),
-    LatLng(27.6677, 85.3324),
-    LatLng(27.6545, 85.3178),
-    LatLng(27.6619, 85.2952),
-    LatLng(27.6804, 85.2918),
-    LatLng(27.6901, 85.2991),
+    LatLng(27.6912, 85.3127), // North-West (e.g., Godawari-side)
+    LatLng(27.6815, 85.3293), // North-East (e.g., Koteshwor-side)
+    LatLng(27.6677, 85.3324), // East (e.g., Gwarko-side)
+    LatLng(27.6545, 85.3178), // South-East (e.g., Lubhu-side)
+    LatLng(27.6619, 85.2952), // South-West (e.g., Bungamati-side)
+    LatLng(27.6804, 85.2918), // West (e.g., Balkhu-side)
+    LatLng(27.6901, 85.2991), // North-West (closer to ring road)
   ];
+
+  final double _stationReturnRadiusMeters =
+      50.0; // 50 meters radius to consider "at a station"
 
   @override
   void initState() {
@@ -96,21 +103,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
   }
 
-  Future<List<LatLng>> fetchRoute(LatLng start, LatLng end) async {
-    final url = Uri.parse(
-      'http://router.project-osrm.org/route/v1/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?overview=full&geometries=geojson',
-    );
-
-    final response = await http.get(url);
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      final coords = data['routes'][0]['geometry']['coordinates'] as List;
-      return coords.map<LatLng>((c) => LatLng(c[1], c[0])).toList();
-    } else {
-      throw Exception('Failed to fetch route');
-    }
-  }
-
   Future<void> _initLocation() async {
     bool serviceEnabled = await _location.serviceEnabled();
     if (!serviceEnabled) serviceEnabled = await _location.requestService();
@@ -136,12 +128,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         );
       });
 
-      // 🛠 FIX THIS LINE:
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _mapController.move(userLoc, 15);
       });
     }
 
+    // Listen for real-time location updates for the user
     _location.onLocationChanged.listen((loc) {
       if (loc.latitude != null && loc.longitude != null) {
         final updatedLoc = LatLng(loc.latitude!, loc.longitude!);
@@ -157,6 +149,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               size: 36,
             ),
           );
+          // For the dummy bike movement, we will keep it independent of user's _currentLocation
+          // unless the dummy movement is directly tied to user's location.
+          // Since you want "he can do anywhere it wants" for the bike, the dummy movement
+          // will simulate random movement from the bike's perspective, not necessarily tracking the user exactly.
+          // _activeBikeLocation is updated by _startDummyBikeMovement, not here.
         });
       }
     });
@@ -165,16 +162,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   Future<void> _loadStations() async {
     try {
       final stations = await StationService.fetchStations();
-      print("🔥 Stations fetched: ${stations.length}");
-      if (stations.isNotEmpty) {
-        print(
-          "🚲 First station lat/lng: ${stations.first.lat}, ${stations.first.lng}",
-        );
-      }
-      print(
-        "📍 First station: ${stations.isNotEmpty ? stations.first.toJson() : 'None'}",
-      );
-
+      debugPrint("🔥 Stations fetched: ${stations.length}");
       setState(() {
         _stations.clear();
         _stations.addAll(stations);
@@ -201,23 +189,22 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         context,
         station,
         _userProfile!,
+        // When ride is confirmed, the bikeLocation passed is the *station's* location
         onRideStartConfirmed: (code, rideId, endTime, bikeLocation) async {
-          final route = await fetchRoute(_currentLocation!, bikeLocation);
           setState(() {
             _isRideActive = true;
             _activeBikeCode = code;
             _activeRideId = rideId;
             _rideEndTime = endTime;
-            _activeBikeStartLocation = bikeLocation;
-            _rideRoute = route; // ⬅️ Store route
-            _routeIndex = 0; // ⬅️ Reset index
+            // The bike starts at the station's location
+            _activeBikeLocation = bikeLocation;
           });
           _startRideCountdown();
-          _startDummyBikeMovement();
+          _startDummyBikeMovement(); // This will simulate random movement for the bike
         },
       ),
     );
-    _loadStations();
+    _loadStations(); // Refresh stations after sheet is dismissed, in case a bike was taken
   }
 
   void _startRideCountdown() {
@@ -228,44 +215,147 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         _remainingRideTime = _rideEndTime!.difference(DateTime.now());
         if (_remainingRideTime.isNegative) {
           timer.cancel();
-          _endRide(manualEnd: false);
+          _endRide(manualEnd: false); // Auto-end if time runs out
         }
       });
     });
   }
 
+  // This function will simulate random movement within a broader area for the bike
   void _startDummyBikeMovement() {
     _dummyBikeMovementTimer?.cancel();
 
-    _dummyBikeMovementTimer = Timer.periodic(const Duration(seconds: 1), (
+    _dummyBikeMovementTimer = Timer.periodic(const Duration(seconds: 5), (
       timer,
     ) {
-      if (_routeIndex < _rideRoute.length) {
-        setState(() {
-          _activeBikeStartLocation = _rideRoute[_routeIndex];
-          _routeIndex++;
-        });
-      } else {
-        timer.cancel(); // Reached end of route
+      if (!_isRideActive) {
+        timer.cancel();
+        return;
       }
+      setState(() {
+        if (_activeBikeLocation != null) {
+          // Simulate movement by adding a small random offset
+          // These offsets are approximate to keep movement local but not fixed
+          double latOffset =
+              (_random.nextDouble() - 0.5) *
+              0.001; // +/- 0.0005 degrees (approx 55 meters)
+          double lngOffset = (_random.nextDouble() - 0.5) * 0.001;
+
+          LatLng newLocation = LatLng(
+            _activeBikeLocation!.latitude + latOffset,
+            _activeBikeLocation!.longitude + lngOffset,
+          );
+
+          // Optional: Restrict movement to a general area or Lalitpur boundary
+          // For truly "anywhere in Lalitpur", this might be less strict.
+          // For this dummy, we assume small increments keep it reasonably local.
+          _activeBikeLocation = newLocation;
+        } else if (_currentLocation != null) {
+          // Fallback: If activeBikeLocation somehow became null, re-initialize it
+          // This might happen if the ride was just started and _activeBikeLocation wasn't set yet.
+          _activeBikeLocation =
+              _currentLocation; // Using user location as a temporary start for dummy move
+        }
+      });
     });
+  }
+
+  // New Helper: Point-in-polygon check for Lalitpur boundary
+  bool _isPointInPolygon(LatLng point, List<LatLng> polygon) {
+    if (polygon.isEmpty) return false;
+    int intersectCount = 0;
+    for (int i = 0; i < polygon.length - 1; i++) {
+      LatLng p1 = polygon[i];
+      LatLng p2 = polygon[i + 1];
+
+      // Check if point.longitude is between p1.longitude and p2.longitude (exclusive)
+      if (((p1.longitude <= point.longitude &&
+                  point.longitude < p2.longitude) ||
+              (p2.longitude <= point.longitude &&
+                  point.longitude < p1.longitude)) &&
+          (point.latitude <
+              (p2.latitude - p1.latitude) *
+                      (point.longitude - p1.longitude) /
+                      (p2.longitude - p1.longitude) +
+                  p1.latitude)) {
+        intersectCount++;
+      }
+    }
+    // If the point's longitude is on the edge
+    if (point.longitude == polygon.last.longitude &&
+        point.longitude == polygon.first.longitude) {
+      if ((point.latitude >=
+              min(polygon.last.latitude, polygon.first.latitude) &&
+          point.latitude <=
+              max(polygon.last.latitude, polygon.first.latitude))) {
+        return true; // Point on a vertical edge.
+      }
+    }
+
+    return intersectCount % 2 == 1; // Odd number of intersections means inside
+  }
+
+  // New Helper: Check if a point is near any station
+  Station? _isNearStation(LatLng point) {
+    final Distance distance = const Distance(); // From latlong2 package
+    for (var station in _stations) {
+      final stationLatLng = LatLng(station.lat, station.lng);
+      final double dist = distance(point, stationLatLng);
+      debugPrint("Distance to ${station.name}: $dist meters");
+      if (dist <= _stationReturnRadiusMeters) {
+        return station;
+      }
+    }
+    return null;
   }
 
   Future<void> _endRide({bool manualEnd = true}) async {
     _rideCountdownTimer?.cancel();
     _dummyBikeMovementTimer?.cancel();
 
-    if (_activeRideId == null || _currentLocation == null) {
+    if (_activeRideId == null || _activeBikeLocation == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("❌ Missing ride or location data")),
+        const SnackBar(content: Text("❌ Missing ride or bike location data")),
       );
       return;
+    }
+
+    // Determine the end location for the API call
+    LatLng finalEndLocation = _activeBikeLocation!;
+    String? endStationId;
+    String returnMessage = '';
+
+    // Step 1: Check if near a required station
+    final Station? nearbyStation = _isNearStation(finalEndLocation);
+    if (nearbyStation != null) {
+      endStationId = nearbyStation.id;
+      returnMessage = '✅ Ride ended at ${nearbyStation.name} station!';
+    }
+    // Step 2: If not near a station, check if inside Lalitpur boundary
+    else if (_isPointInPolygon(finalEndLocation, _lalitpurBoundary)) {
+      returnMessage = '✅ Ride ended successfully within Lalitpur boundary!';
+    }
+    // Step 3: If neither, show error and prevent end
+    else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "⚠️ Cannot end ride here. Please return to a station or stay within Lalitpur.",
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      // Re-activate timers if ride couldn't be ended
+      _startRideCountdown();
+      _startDummyBikeMovement();
+      return; // Stop here, do not call API
     }
 
     try {
       final response = await _apiService.endRide(
         rideId: _activeRideId!,
-        userLocation: _currentLocation!,
+        userLocation: finalEndLocation,
+        endStationId: endStationId, // Pass null if not ending at a station
       );
 
       if (response['success'] == true) {
@@ -273,30 +363,27 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           _isRideActive = false;
           _activeBikeCode = null;
           _activeRideId = null;
-          _activeBikeStartLocation = null;
+          _activeBikeLocation = null; // Clear the bike's location
           _rideEndTime = null;
           _remainingRideTime = Duration.zero;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              manualEnd
-                  ? '✅ Ride ended successfully!'
-                  : '⏱️ Ride auto-ended. Time up!',
-            ),
+            content: Text(returnMessage), // Use dynamic message
             backgroundColor: Colors.green,
           ),
         );
       } else {
         final message = response['message'] ?? 'Ride could not be ended.';
-        if (message.contains("Please return bike to station")) {
-          _showReturnToStationWarning();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('⚠️ Failed: $message')));
+        // If there's an API-side error but the app state still indicates active,
+        // (e.g., backend has more strict rules), re-enable timers.
+        if (_isRideActive) {
+          // Check _isRideActive in case it was already set to false
           _startRideCountdown();
           _startDummyBikeMovement();
-        } else {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('⚠️ Failed: $message')));
         }
       }
     } catch (e) {
@@ -304,27 +391,14 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('❌ Error: ${e.toString()}')));
-      _startRideCountdown();
-      _startDummyBikeMovement();
+      // Re-enable timers if an exception occurred and ride is still conceptually active
+      if (_isRideActive) {
+        _startRideCountdown();
+        _startDummyBikeMovement();
+      }
     } finally {
-      await _loadStations();
+      await _loadStations(); // Always refresh stations to reflect bike availability changes
     }
-  }
-
-  void _showReturnToStationWarning() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Return to Station"),
-        content: const Text("⚠️ Please return bike to a station to end ride."),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("OK"),
-          ),
-        ],
-      ),
-    );
   }
 
   String _formatDuration(Duration duration) {
@@ -364,18 +438,26 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                           'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                       subdomains: const ['a', 'b', 'c'],
                     ),
+                    // Display Lalitpur Boundary
                     PolylineLayer(
                       polylines: [
                         Polyline(
-                          points: _lalitpurBoundary + [_lalitpurBoundary[0]],
-                          strokeWidth: 2,
-                          color: Colors.red,
-                          isDotted: true,
+                          points:
+                              _lalitpurBoundary +
+                              [
+                                _lalitpurBoundary.first,
+                              ], // Connects back to the first point
+                          strokeWidth:
+                              3, // Make boundary thicker for visibility
+                          color: Colors
+                              .deepOrange, // Changed color for distinction
+                          isDotted: false, // Solid line for clarity
                         ),
                       ],
                     ),
                     MarkerLayer(
                       markers: [
+                        // Station Markers
                         ..._stations.map(
                           (station) => Marker(
                             point: LatLng(station.lat, station.lng),
@@ -387,13 +469,14 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                                 Icons.location_on,
                                 size: 40,
                                 color: station.availableBikes > 0
-                                    ? Colors.indigo
-                                    : Colors.redAccent,
+                                    ? Colors
+                                          .indigo // Available bikes
+                                    : Colors.grey, // No bikes available, subtle
                               ),
                             ),
                           ),
                         ),
-                        // 🔵 Current Location Marker with ripple
+                        // Current User Location Marker with ripple
                         if (_currentLocation != null)
                           Marker(
                             point: _currentLocation!,
@@ -426,9 +509,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                             ),
                           ),
 
-                        if (_isRideActive && _activeBikeStartLocation != null)
+                        // Active Bike Marker (showing bike's simulated position)
+                        if (_isRideActive && _activeBikeLocation != null)
                           Marker(
-                            point: _activeBikeStartLocation!,
+                            point: _activeBikeLocation!,
                             width: 60,
                             height: 60,
                             child: const Icon(

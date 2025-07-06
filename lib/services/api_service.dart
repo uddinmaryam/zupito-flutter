@@ -62,23 +62,31 @@ class ApiService {
     }
   }
 
-  // ✅ NEW: endRide method
+  // ✅ UPDATED: endRide method to accept optional endStationId
   Future<Map<String, dynamic>> endRide({
     required String rideId,
     required LatLng userLocation,
+    String? endStationId, // New optional parameter
   }) async {
     final url = Uri.parse('$_baseUrl/rides/end'); // Your backend endpoint
     try {
+      final Map<String, dynamic> requestBody = {
+        'rideId': rideId,
+        'userLocation': {
+          'latitude': userLocation.latitude,
+          'longitude': userLocation.longitude,
+        },
+      };
+
+      // Add endStationId to the request body if it's provided
+      if (endStationId != null) {
+        requestBody['endStationId'] = endStationId;
+      }
+
       final response = await http.post(
         url,
         headers: _getHeaders(),
-        body: json.encode({
-          'rideId': rideId,
-          'userLocation': {
-            'latitude': userLocation.latitude,
-            'longitude': userLocation.longitude,
-          },
-        }),
+        body: json.encode(requestBody), // Use the modified requestBody
       );
 
       if (response.statusCode == 200) {
@@ -93,4 +101,6 @@ class ApiService {
       throw Exception('Error calling endRide API: $e');
     }
   }
+
+  Future getActiveRide() async {}
 }

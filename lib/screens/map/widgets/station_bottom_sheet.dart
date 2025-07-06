@@ -15,7 +15,7 @@ import '../../../utils/constants.dart';
 
 Widget buildStationBottomSheet(
   BuildContext context,
-  Station station,
+  Station station, // Pass the station object to access its coordinates
   UserProfile userProfile, {
   required Future<void> Function(
     String bikeCode,
@@ -35,7 +35,7 @@ Widget buildStationBottomSheet(
       backgroundColor: Colors.transparent,
       builder: (context) => buildStationBottomSheet(
         context,
-        station,
+        station, // Ensure station is passed here for refresh
         userProfile,
         onRideStartConfirmed: onRideStartConfirmed,
       ),
@@ -109,6 +109,10 @@ Widget buildStationBottomSheet(
                         isAvailable: true,
                         onRefresh: refreshSheet,
                         onRideStartConfirmed: onRideStartConfirmed,
+                        stationStartLocation: LatLng(
+                          station.lat,
+                          station.lng,
+                        ), // Pass station location
                       ),
                     )
                     .toList(),
@@ -135,6 +139,10 @@ Widget buildStationBottomSheet(
                         isAvailable: false,
                         onRefresh: refreshSheet,
                         onRideStartConfirmed: onRideStartConfirmed,
+                        stationStartLocation: LatLng(
+                          station.lat,
+                          station.lng,
+                        ), // Pass station location
                       ),
                     )
                     .toList(),
@@ -165,6 +173,7 @@ class _BikeCard extends StatefulWidget {
     LatLng bikeStartLocation,
   )?
   onRideStartConfirmed;
+  final LatLng stationStartLocation; // New field to hold the station's location
 
   const _BikeCard({
     super.key,
@@ -172,6 +181,7 @@ class _BikeCard extends StatefulWidget {
     required this.isAvailable,
     required this.onRefresh,
     this.onRideStartConfirmed,
+    required this.stationStartLocation, // Initialize in constructor
   });
 
   @override
@@ -257,6 +267,11 @@ class _BikeCardState extends State<_BikeCard> {
 
       final double estimatedCost = duration * _pricePerMinute;
 
+      // *** IMPORTANT CHANGE HERE ***
+      // Use the station's coordinates as the start location for the ride.
+      final double startLatitude = widget.stationStartLocation.latitude;
+      final double startLongitude = widget.stationStartLocation.longitude;
+
       final response = await http.post(
         Uri.parse('${Constants.apiUrl}/rides/start'),
         headers: _jsonHeaders,
@@ -265,8 +280,8 @@ class _BikeCardState extends State<_BikeCard> {
           'bikeId': bike.id,
           'selectedDuration': duration,
           'estimatedCost': estimatedCost,
-          'startLat': bike.lat,
-          'startLng': bike.lng,
+          'startLat': startLatitude, // Use station's latitude
+          'startLng': startLongitude, // Use station's longitude
         }),
       );
 
@@ -279,19 +294,18 @@ class _BikeCardState extends State<_BikeCard> {
             ? DateTime.parse(data['rideEndTime'])
             : DateTime.now().add(Duration(minutes: duration));
 
-        final LatLng bikeStartLocation = data['bikeLocation'] != null
-            ? LatLng(
-                data['bikeLocation']['latitude'] ?? bike.lat,
-                data['bikeLocation']['longitude'] ?? bike.lng,
-              )
-            : LatLng(bike.lat, bike.lng);
+        // The 'bikeStartLocation' passed to onRideStartConfirmed should also reflect the station's location
+        final LatLng confirmedBikeStartLocation = LatLng(
+          startLatitude,
+          startLongitude,
+        );
 
         if (widget.onRideStartConfirmed != null) {
           await widget.onRideStartConfirmed!(
             bikeCode,
             rideId,
             rideEndTime,
-            bikeStartLocation,
+            confirmedBikeStartLocation,
           );
         }
 
