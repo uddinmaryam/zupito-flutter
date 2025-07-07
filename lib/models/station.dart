@@ -7,6 +7,7 @@ class Station {
   final double lng;
   final List<Bike> bikes;
   final String description;
+  final int capacity; // ✅ Add this field properly
 
   Station({
     required this.id,
@@ -15,6 +16,7 @@ class Station {
     required this.lng,
     required this.bikes,
     required this.description,
+    required this.capacity, // ✅ Correctly required now
   });
 
   factory Station.fromJson(Map<String, dynamic> json) {
@@ -27,16 +29,14 @@ class Station {
           .map((bikeJson) => Bike.fromJson(bikeJson))
           .toList(),
       description: json['description'] ?? '',
+      capacity: json['capacity'] ?? 10, // ✅ Default fallback if null
     );
   }
 
-  // ✅ CONFIRMED: Correctly calculates the number of available bikes
-  // This uses the 'isAvailable' property from your Bike model.
   int get availableBikes {
     return bikes.where((bike) => bike.isAvailable).length;
   }
 
-  // You can also add a getter for unavailable bikes if needed for other logic
   int get unavailableBikes {
     return bikes.where((bike) => !bike.isAvailable).length;
   }
@@ -51,6 +51,7 @@ class Station {
       'longitude': lng,
       'bikes': bikes.map((bike) => bike.toJson()).toList(),
       'description': description,
+      'capacity': capacity, // ✅ Include it in toJson
     };
   }
 }

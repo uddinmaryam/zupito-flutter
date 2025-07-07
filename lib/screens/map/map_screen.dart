@@ -16,6 +16,7 @@ import 'package:zupito/services/api_service.dart';
 import 'package:zupito/services/otp_socket_service.dart';
 import 'package:zupito/services/secure_storage_services.dart';
 import 'package:zupito/services/station_service.dart';
+import 'package:zupito/utils/constants.dart';
 import 'widgets/station_bottom_sheet.dart'; // Ensure this path is correct
 
 // For distance calculations
@@ -91,6 +92,72 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       const Duration(seconds: 5),
       (_) => _loadStations(),
     );
+  }
+
+  Future<void> _moveToNearestStation() async {
+    if (_currentLocation == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("❌ Location not available")));
+      return;
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('${Constants.apiUrl}/stations/nearest'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'lat': _currentLocation!.latitude,
+          'lon': _currentLocation!.longitude,
+          'k': 3, // Request 2 nearest stations
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        final List<dynamic> nearestList = json['nearestStations'];
+
+        if (nearestList.isNotEmpty) {
+          final nearestId = nearestList.first['id'];
+
+          // Find full station info from previously loaded _stations list
+          final fullStation = _stations.firstWhere(
+            (s) => s.id == nearestId,
+            orElse: () {
+              // Fallback in case it's not found (e.g., race condition)
+              final fallback = nearestList.first;
+              return Station(
+                id: fallback['id'],
+                name: fallback['name'],
+                lat: fallback['latitude'],
+                lng: fallback['longitude'],
+                capacity: fallback['capacity'] ?? 10,
+                bikes: [],
+                description: '',
+              );
+            },
+          );
+
+          // Move map to that station
+          _mapController.move(LatLng(fullStation.lat, fullStation.lng), 17.0);
+
+          // Open bottom sheet for that station
+          _onStationTap(fullStation);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("❌ No nearby station found")),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("❌ Failed: ${response.body}")));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("❌ Error: ${e.toString()}")));
+    }
   }
 
   Future<void> _loadUserProfile() async {
@@ -438,26 +505,18 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                           'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                       subdomains: const ['a', 'b', 'c'],
                     ),
-                    // Display Lalitpur Boundary
                     PolylineLayer(
                       polylines: [
                         Polyline(
-                          points:
-                              _lalitpurBoundary +
-                              [
-                                _lalitpurBoundary.first,
-                              ], // Connects back to the first point
-                          strokeWidth:
-                              3, // Make boundary thicker for visibility
-                          color: Colors
-                              .deepOrange, // Changed color for distinction
-                          isDotted: false, // Solid line for clarity
+                          points: _lalitpurBoundary + [_lalitpurBoundary.first],
+                          strokeWidth: 3,
+                          color: Colors.deepOrange,
+                          isDotted: false,
                         ),
                       ],
                     ),
                     MarkerLayer(
                       markers: [
-                        // Station Markers
                         ..._stations.map(
                           (station) => Marker(
                             point: LatLng(station.lat, station.lng),
@@ -469,14 +528,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                                 Icons.location_on,
                                 size: 40,
                                 color: station.availableBikes > 0
-                                    ? Colors
-                                          .indigo // Available bikes
-                                    : Colors.grey, // No bikes available, subtle
+                                    ? Colors.indigo
+                                    : Colors.grey,
                               ),
                             ),
                           ),
                         ),
-                        // Current User Location Marker with ripple
                         if (_currentLocation != null)
                           Marker(
                             point: _currentLocation!,
@@ -487,18 +544,16 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                               children: [
                                 AnimatedBuilder(
                                   animation: _rippleController,
-                                  builder: (context, child) {
-                                    return Container(
-                                      width: _rippleAnimation.value,
-                                      height: _rippleAnimation.value,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: Colors.blue.withOpacity(
-                                          1 - _rippleController.value,
-                                        ),
+                                  builder: (context, child) => Container(
+                                    width: _rippleAnimation.value,
+                                    height: _rippleAnimation.value,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.blue.withOpacity(
+                                        1 - _rippleController.value,
                                       ),
-                                    );
-                                  },
+                                    ),
+                                  ),
                                 ),
                                 const Icon(
                                   Icons.person_pin_circle,
@@ -508,8 +563,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                               ],
                             ),
                           ),
-
-                        // Active Bike Marker (showing bike's simulated position)
                         if (_isRideActive && _activeBikeLocation != null)
                           Marker(
                             point: _activeBikeLocation!,
@@ -574,6 +627,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               ),
             ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _moveToNearestStation,
+        icon: const Icon(Icons.navigation),
+        label: const Text("Nearest Station"),
+        backgroundColor: Colors.deepOrange,
       ),
     );
   }
