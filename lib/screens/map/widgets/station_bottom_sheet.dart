@@ -1,7 +1,8 @@
-// ✅ Fully Fixed and Updated station_bottom_sheet.dart
+// lib/screens/map/widgets/station_bottom_sheet.dart
 
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
@@ -15,13 +16,14 @@ import '../../../utils/constants.dart';
 
 Widget buildStationBottomSheet(
   BuildContext context,
-  Station station, // Pass the station object to access its coordinates
+  Station station,
   UserProfile userProfile, {
   required Future<void> Function(
     String bikeCode,
     String rideId,
     DateTime rideEndTime,
     LatLng bikeStartLocation,
+    Station selectedDestinationStation,
   )
   onRideStartConfirmed,
 }) {
@@ -35,7 +37,7 @@ Widget buildStationBottomSheet(
       backgroundColor: Colors.transparent,
       builder: (context) => buildStationBottomSheet(
         context,
-        station, // Ensure station is passed here for refresh
+        station,
         userProfile,
         onRideStartConfirmed: onRideStartConfirmed,
       ),
@@ -109,10 +111,9 @@ Widget buildStationBottomSheet(
                         isAvailable: true,
                         onRefresh: refreshSheet,
                         onRideStartConfirmed: onRideStartConfirmed,
-                        stationStartLocation: LatLng(
-                          station.lat,
-                          station.lng,
-                        ), // Pass station location
+                        stationStartLocation: LatLng(station.lat, station.lng),
+                        startStationId: station.id,
+                        station: station,
                       ),
                     )
                     .toList(),
@@ -139,10 +140,9 @@ Widget buildStationBottomSheet(
                         isAvailable: false,
                         onRefresh: refreshSheet,
                         onRideStartConfirmed: onRideStartConfirmed,
-                        stationStartLocation: LatLng(
-                          station.lat,
-                          station.lng,
-                        ), // Pass station location
+                        stationStartLocation: LatLng(station.lat, station.lng),
+                        startStationId: station.id,
+                        station: station,
                       ),
                     )
                     .toList(),
@@ -162,6 +162,8 @@ Widget buildStationBottomSheet(
   );
 }
 
+// The rest of the _BikeCard class remains unchanged and correct as per your latest code.
+
 class _BikeCard extends StatefulWidget {
   final Bike bike;
   final bool isAvailable;
@@ -171,9 +173,12 @@ class _BikeCard extends StatefulWidget {
     String rideId,
     DateTime rideEndTime,
     LatLng bikeStartLocation,
+    Station selectedDestinationStation, // Updated to pass Station object
   )?
   onRideStartConfirmed;
-  final LatLng stationStartLocation; // New field to hold the station's location
+  final LatLng stationStartLocation; // Holds the station's geo location
+  final String startStationId; // ✅ New: Holds the ID of the start station
+  final Station station;
 
   const _BikeCard({
     super.key,
@@ -181,7 +186,9 @@ class _BikeCard extends StatefulWidget {
     required this.isAvailable,
     required this.onRefresh,
     this.onRideStartConfirmed,
-    required this.stationStartLocation, // Initialize in constructor
+    required this.stationStartLocation,
+    required this.startStationId,
+    required this.station, // Initialize in constructor
   });
 
   @override
@@ -193,66 +200,203 @@ class _BikeCardState extends State<_BikeCard> {
   final ApiService _apiService = ApiService();
   static const double _pricePerMinute = 2.0;
 
+  List<Station> _selectableStations = []; // ✅ New list for dropdown items
+  Station? _selectedDestinationStation; // Keep as Station object
+
   Map<String, String> get _jsonHeaders => {'Content-Type': 'application/json'};
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStations();
+  }
+
+  Future<void> _fetchStations() async {
+    try {
+      final allStations = await _apiService.getStations();
+
+      final List<Station> otherStations = allStations
+          .where((s) => s.id != widget.startStationId)
+          .toList();
+
+      Station? currentStartStation;
+      if (allStations.any((s) => s.id == widget.startStationId)) {
+        currentStartStation = allStations.firstWhere(
+          (s) => s.id == widget.startStationId,
+        );
+      }
+
+      // ⚠️ Must use `setState` only once to prevent rebuild confusion
+      List<Station> allSelectable = [...otherStations];
+      if (currentStartStation != null) {
+        allSelectable.add(currentStartStation);
+      }
+
+      Station? preselectStation = allSelectable.isNotEmpty
+          ? allSelectable.first
+          : null;
+
+      setState(() {
+        _selectableStations = allSelectable;
+        _selectedDestinationStation = preselectStation;
+      });
+
+      if (_selectableStations.isEmpty) {
+        showTopNotification(context, "No stations available for selection.");
+      }
+    } catch (e) {
+      showTopNotification(
+        context,
+        "❌ Error fetching stations: ${e.toString()}",
+      );
+      setState(() {
+        _selectableStations = [];
+        _selectedDestinationStation = null;
+      });
+    }
+  }
 
   Future<void> _showPaymentDialog(Bike bike) async {
     final List<int> durations = [30, 45, 60, 90];
     int selectedDuration = durations[0];
+
+    if (_selectableStations.isEmpty) {
+      await _fetchStations();
+      if (_selectableStations.isEmpty) {
+        showTopNotification(context, "No destination stations available.");
+        return;
+      }
+    }
+
+    if (_selectedDestinationStation == null && _selectableStations.isNotEmpty) {
+      setState(() {
+        _selectedDestinationStation = _selectableStations.first;
+      });
+    }
 
     await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
         return StatefulBuilder(
-          builder: (ctx, setState) => AlertDialog(
-            title: const Text("Dummy eSewa Payment"),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Select ride duration:"),
-                const SizedBox(height: 10),
-                DropdownButton<int>(
-                  value: selectedDuration,
-                  isExpanded: true,
-                  onChanged: (value) =>
-                      setState(() => selectedDuration = value!),
-                  items: durations
-                      .map(
-                        (d) => DropdownMenuItem(
+          builder: (ctx, setState) {
+            final selectedStationName = widget.station.name;
+            final predefinedNames = [
+              'Pulchowk',
+              'Jawalakhel',
+              'Dhobighat',
+              'Ekantakuna',
+              'Sanepa Chowk',
+            ];
+
+            final destinationNames = predefinedNames
+                .where((name) => name != selectedStationName)
+                .toList();
+            destinationNames.add('Return to Same Station');
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: const Text("Confirm Ride Details"),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Select ride duration:"),
+                    const SizedBox(height: 10),
+                    DropdownButton<int>(
+                      value: selectedDuration,
+                      isExpanded: true,
+                      onChanged: (value) =>
+                          setState(() => selectedDuration = value!),
+                      items: durations.map((d) {
+                        return DropdownMenuItem(
                           value: d,
                           child: Text("$d minutes"),
-                        ),
-                      )
-                      .toList(),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text("Choose destination station:"),
+                    const SizedBox(height: 10),
+                    DropdownButton<String>(
+                      value:
+                          _selectedDestinationStation?.name ==
+                              selectedStationName
+                          ? 'Return to Same Station'
+                          : _selectedDestinationStation?.name,
+                      isExpanded: true,
+                      onChanged: (String? selectedName) {
+                        setState(() {
+                          if (selectedName == 'Return to Same Station') {
+                            _selectedDestinationStation = widget.station;
+                          } else {
+                            _selectedDestinationStation = _selectableStations
+                                .firstWhere(
+                                  (s) => s.name == selectedName,
+                                  orElse: () => widget.station,
+                                );
+                          }
+                        });
+                      },
+                      items: destinationNames.map((name) {
+                        return DropdownMenuItem<String>(
+                          value: name,
+                          child: Text(name),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 20),
+                    Text("Rate: Rs $_pricePerMinute per minute"),
+                    Text(
+                      "Estimated Cost: Rs ${(selectedDuration * _pricePerMinute).toStringAsFixed(2)}",
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      "(Final cost may vary based on actual ride duration and drop-off location)",
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 20),
-                Text("Rate: Rs $_pricePerMinute per minute"),
-                Text(
-                  "Total: Rs ${(selectedDuration * _pricePerMinute).toStringAsFixed(2)}",
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text("Cancel"),
+                ),
+                ElevatedButton(
+                  onPressed: _selectedDestinationStation == null
+                      ? null
+                      : () async {
+                          Navigator.of(ctx).pop();
+                          await _startRide(
+                            widget.bike,
+                            selectedDuration,
+                            _selectedDestinationStation!.id,
+                          );
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.indigo,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text("Confirm & Pay with eSewa"),
                 ),
               ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text("Cancel"),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  Navigator.of(ctx).pop();
-                  await _startRide(widget.bike, selectedDuration);
-                },
-                child: const Text("Pay with eSewa"),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
   }
 
-  Future<void> _startRide(Bike bike, int duration) async {
+  Future<void> _startRide(
+    Bike bike,
+    int duration,
+    String destinationStationId,
+    // Updated parameter to take ID
+  ) async {
     setState(() => _loading = true);
     try {
       final userJson = await SecureStorageService().readUser();
@@ -265,55 +409,44 @@ class _BikeCardState extends State<_BikeCard> {
         throw Exception("❌ User ID not found in storage.");
       }
 
-      final double estimatedCost = duration * _pricePerMinute;
+      final double initialEstimatedCost = duration * _pricePerMinute;
 
-      // *** IMPORTANT CHANGE HERE ***
-      // Use the station's coordinates as the start location for the ride.
-      final double startLatitude = widget.stationStartLocation.latitude;
-      final double startLongitude = widget.stationStartLocation.longitude;
+      final LatLng confirmedBikeStartLocation = widget.stationStartLocation;
 
-      final response = await http.post(
-        Uri.parse('${Constants.apiUrl}/rides/start'),
-        headers: _jsonHeaders,
-        body: json.encode({
-          'userId': userId,
-          'bikeId': bike.id,
-          'selectedDuration': duration,
-          'estimatedCost': estimatedCost,
-          'startLat': startLatitude, // Use station's latitude
-          'startLng': startLongitude, // Use station's longitude
-        }),
-      );
+      // Use the API service to call the startRide endpoint
+      final Map<String, dynamic> responseData = await _apiService.startRide(
+        userId: userId,
+        bikeId: bike.id,
+        selectedDuration: duration,
+        startStationId: widget
+            .startStationId, // ✅ Pass the actual start station ID from widget
+        destinationStationId:
+            destinationStationId, // ✅ Pass the selected destination ID
+        estimatedCost: initialEstimatedCost,
 
-      if (response.statusCode == 201) {
-        final data = json.decode(response.body);
-        final String rideId = data['rideId'] ?? '';
-        final String bikeCode = bike.code ?? 'Unknown';
+        startLat: confirmedBikeStartLocation.latitude, // <--- ADDED
+        startLng: confirmedBikeStartLocation.longitude, // <--- ADDED
+      ); // Send client's initial estimate
 
-        final DateTime rideEndTime = data['rideEndTime'] != null
-            ? DateTime.parse(data['rideEndTime'])
-            : DateTime.now().add(Duration(minutes: duration));
+      final String rideId = responseData['rideId'] ?? '';
+      final String bikeCode = bike.code ?? 'Unknown';
 
-        // The 'bikeStartLocation' passed to onRideStartConfirmed should also reflect the station's location
-        final LatLng confirmedBikeStartLocation = LatLng(
-          startLatitude,
-          startLongitude,
+      final DateTime rideEndTime = responseData['rideEndTime'] != null
+          ? DateTime.parse(responseData['rideEndTime'])
+          : DateTime.now().add(Duration(minutes: duration));
+
+      if (widget.onRideStartConfirmed != null) {
+        await widget.onRideStartConfirmed!(
+          bikeCode,
+          rideId,
+          rideEndTime,
+          confirmedBikeStartLocation,
+          _selectedDestinationStation!, // ✅ Pass the full Station object
         );
-
-        if (widget.onRideStartConfirmed != null) {
-          await widget.onRideStartConfirmed!(
-            bikeCode,
-            rideId,
-            rideEndTime,
-            confirmedBikeStartLocation,
-          );
-        }
-
-        showTopNotification(context, "✅ Payment Successful! Ride started.");
-        Navigator.pop(context);
-      } else {
-        showTopNotification(context, "❌ Failed: ${response.body}");
       }
+
+      showTopNotification(context, "✅ Payment Successful! Ride started.");
+      Navigator.pop(context); // Close the bottom sheet
     } catch (e) {
       showTopNotification(context, "❌ Error: ${e.toString()}");
     } finally {
@@ -356,7 +489,11 @@ class _BikeCardState extends State<_BikeCard> {
           ),
         );
 
-        if (enteredOtp == null) return;
+        if (enteredOtp == null) {
+          // If OTP dialog was dismissed without submitting
+          if (mounted) setState(() => _loading = false);
+          return;
+        }
 
         final verify = await http.post(
           Uri.parse('${Constants.apiUrl}/bikes/verify-otp'),
@@ -384,7 +521,14 @@ class _BikeCardState extends State<_BikeCard> {
   @override
   Widget build(BuildContext context) {
     return Card(
+      margin: const EdgeInsets.symmetric(
+        vertical: 8.0,
+      ), // Added margin for better spacing
       child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16.0,
+          vertical: 8.0,
+        ), // Added padding
         title: Text(widget.bike.name ?? 'Bike'),
         subtitle: Text('Code: ${widget.bike.code ?? 'N/A'}'),
         trailing: widget.isAvailable
@@ -427,7 +571,10 @@ class _OTPDialogState extends State<_OTPDialog> {
       setState(() => _secondsLeft--);
       if (_secondsLeft == 0) {
         _timer.cancel();
-        Navigator.pop(context);
+        // Check if the dialog is still mounted before popping
+        if (Navigator.of(context).canPop()) {
+          Navigator.pop(context);
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("⏱️ Time expired. Please try again.")),
         );

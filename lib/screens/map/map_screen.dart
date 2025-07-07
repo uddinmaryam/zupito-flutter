@@ -70,6 +70,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   final double _stationReturnRadiusMeters =
       50.0; // 50 meters radius to consider "at a station"
 
+  // ADD THIS NEAR THE OTHER STATE VARIABLES (OUTSIDE initState)
+  Station? _destinationStation; // 👈 global declaration
+
   @override
   void initState() {
     super.initState();
@@ -109,7 +112,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         body: jsonEncode({
           'lat': _currentLocation!.latitude,
           'lon': _currentLocation!.longitude,
-          'k': 3, // Request 2 nearest stations
+          'k': 2, // Request 2 nearest stations
         }),
       );
 
@@ -248,7 +251,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       ).showSnackBar(const SnackBar(content: Text("User or location missing")));
       return;
     }
-
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -256,22 +258,29 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         context,
         station,
         _userProfile!,
-        // When ride is confirmed, the bikeLocation passed is the *station's* location
-        onRideStartConfirmed: (code, rideId, endTime, bikeLocation) async {
-          setState(() {
-            _isRideActive = true;
-            _activeBikeCode = code;
-            _activeRideId = rideId;
-            _rideEndTime = endTime;
-            // The bike starts at the station's location
-            _activeBikeLocation = bikeLocation;
-          });
-          _startRideCountdown();
-          _startDummyBikeMovement(); // This will simulate random movement for the bike
-        },
+        onRideStartConfirmed:
+            (
+              code,
+              rideId,
+              endTime,
+              bikeStartLocation,
+              selectedDestinationStation,
+            ) async {
+              setState(() {
+                _isRideActive = true;
+                _activeBikeCode = code;
+                _activeRideId = rideId;
+                _rideEndTime = endTime;
+                _activeBikeLocation = bikeStartLocation;
+                _destinationStation = selectedDestinationStation;
+              });
+              _startRideCountdown();
+              _startDummyBikeMovement();
+            },
       ),
     );
-    _loadStations(); // Refresh stations after sheet is dismissed, in case a bike was taken
+
+    _loadStations(); // Refresh stations after sheet is dismissed
   }
 
   void _startRideCountdown() {
@@ -422,7 +431,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       final response = await _apiService.endRide(
         rideId: _activeRideId!,
         userLocation: finalEndLocation,
-        endStationId: endStationId, // Pass null if not ending at a station
+        // REMOVED 'endStationId: endStationId' because ApiService's endRide no longer expects it
       );
 
       if (response['success'] == true) {
@@ -572,6 +581,20 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                               Icons.pedal_bike,
                               size: 36,
                               color: Colors.black,
+                            ),
+                          ),
+                        if (_isRideActive && _destinationStation != null)
+                          Marker(
+                            point: LatLng(
+                              _destinationStation!.lat,
+                              _destinationStation!.lng,
+                            ),
+                            width: 60,
+                            height: 60,
+                            child: const Icon(
+                              Icons.flag,
+                              size: 36,
+                              color: Colors.red,
                             ),
                           ),
                       ],

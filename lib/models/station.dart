@@ -15,7 +15,7 @@ class Station {
     required this.lat,
     required this.lng,
     required this.bikes,
-    required this.description,
+    this.description = '',
     required this.capacity, // ✅ Correctly required now
   });
 

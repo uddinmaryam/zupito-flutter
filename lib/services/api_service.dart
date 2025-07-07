@@ -1,11 +1,12 @@
 // lib/services/api_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:latlong2/latlong.dart'; // Make sure this is imported
+import 'package:latlong2/latlong.dart';
+import '../models/station.dart'; // Import your Station model
 
 class ApiService {
   static const String _baseUrl =
-      'https://backend-bicycle-1.onrender.com/api'; // ✅ IMPORTANT: Your Node.js backend URL
+      'https://backend-bicycle-1.onrender.com/api/v1'; // ✅ IMPORTANT: Your Node.js backend URL
 
   String? _authToken; // Assuming you handle authentication elsewhere
 
@@ -20,20 +21,41 @@ class ApiService {
     };
   }
 
-  // Existing methods (e.g., unlockBike) can go here
+  // New method to fetch all stations
+  Future<List<Station>> getStations() async {
+    final url = Uri.parse('$_baseUrl/stations');
+
+    try {
+      final response = await http.get(url, headers: _getHeaders());
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonMap = json.decode(response.body);
+        final List<dynamic> jsonList = jsonMap['stations']; // ✅ this is key
+
+        return jsonList.map((json) => Station.fromJson(json)).toList();
+      } else {
+        final errorBody = json.decode(response.body);
+        throw Exception(
+          'Failed to load stations: ${errorBody['message'] ?? 'Unknown error'} (Status: ${response.statusCode})',
+        );
+      }
+    } catch (e) {
+      throw Exception('Error calling getStations API: $e');
+    }
+  }
 
   Future<Map<String, dynamic>> startRide({
     required String userId,
     required String bikeId,
     required int selectedDuration,
-    required double startLat,
-    required double startLng,
+    required String startStationId, // Explicitly passing start station ID
+    required String
+    destinationStationId, // Explicitly passing destination station ID
     required double estimatedCost,
+    // ADDED THESE TWO PARAMETERS:
+    required double startLat, // <--- Corrected: Now a required parameter
+    required double startLng, // <--- Corrected: Now a required parameter
   }) async {
-    // NO duplicate estimatedCost inside the method
-
-    // Rs. 2 per minute
-
     final url = Uri.parse('$_baseUrl/rides/start');
     try {
       final response = await http.post(
@@ -43,18 +65,25 @@ class ApiService {
           'userId': userId,
           'bikeId': bikeId,
           'selectedDuration': selectedDuration,
+          'startStationId': startStationId, // Send start station ID
+          'destinationStationId': destinationStationId, // Send destination ID
           'estimatedCost': estimatedCost,
-          'startLat': startLat,
-          'startLng': startLng,
+          'startLocation': {
+            // Send location explicitly
+            'latitude': startLat,
+            'longitude': startLng,
+          },
         }),
       );
+      print('Start Ride API Response Status: ${response.statusCode}');
+      print('Start Ride API Response Body: ${response.body}');
 
       if (response.statusCode == 201) {
         return json.decode(response.body);
       } else {
         final errorBody = json.decode(response.body);
         throw Exception(
-          'Failed to start ride: ${errorBody['error'] ?? 'Unknown error'} (Status: ${response.statusCode})',
+          'Failed to start ride: ${errorBody['error'] ?? errorBody['message'] ?? 'Unknown error'} (Status: ${response.statusCode})', // Improved error message parsing
         );
       }
     } catch (e) {
@@ -62,13 +91,11 @@ class ApiService {
     }
   }
 
-  // ✅ UPDATED: endRide method to accept optional endStationId
   Future<Map<String, dynamic>> endRide({
     required String rideId,
     required LatLng userLocation,
-    String? endStationId, // New optional parameter
   }) async {
-    final url = Uri.parse('$_baseUrl/rides/end'); // Your backend endpoint
+    final url = Uri.parse('$_baseUrl/rides/end');
     try {
       final Map<String, dynamic> requestBody = {
         'rideId': rideId,
@@ -78,19 +105,16 @@ class ApiService {
         },
       };
 
-      // Add endStationId to the request body if it's provided
-      if (endStationId != null) {
-        requestBody['endStationId'] = endStationId;
-      }
-
       final response = await http.post(
         url,
         headers: _getHeaders(),
-        body: json.encode(requestBody), // Use the modified requestBody
+        body: json.encode(requestBody),
       );
+      print('End Ride API Response Status: ${response.statusCode}');
+      print('End Ride API Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
-        return json.decode(response.body); // Expect success, message
+        return json.decode(response.body);
       } else {
         final errorBody = json.decode(response.body);
         throw Exception(
@@ -102,5 +126,29 @@ class ApiService {
     }
   }
 
-  Future getActiveRide() async {}
+  Future getActiveRide() async {
+    final url = Uri.parse('$_baseUrl/rides/active');
+    try {
+      final response = await http.get(url, headers: _getHeaders());
+      print('Get Active Ride API Response Status: ${response.statusCode}');
+      print('Get Active Ride API Response Body: ${response.body}');
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseBody = json.decode(response.body);
+        if (responseBody['activeRide'] == true) {
+          return responseBody['rideDetails'];
+        }
+        return null;
+      } else if (response.statusCode == 404) {
+        return null;
+      } else {
+        final errorBody = json.decode(response.body);
+        throw Exception(
+          'Failed to get active ride: ${errorBody['message'] ?? 'Unknown error'} (Status: ${response.statusCode})',
+        );
+      }
+    } catch (e) {
+      print('Error checking for active ride: $e');
+      return null;
+    }
+  }
 }
