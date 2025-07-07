@@ -257,7 +257,7 @@ class _BikeCardState extends State<_BikeCard> {
   }
 
   Future<void> _showPaymentDialog(Bike bike) async {
-    final List<int> durations = [30, 45, 60, 90];
+    final List<int> durations = [1, 2, 5, 30, 45, 60];
     int selectedDuration = durations[0];
 
     if (_selectableStations.isEmpty) {

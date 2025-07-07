@@ -95,34 +95,25 @@ class ApiService {
     required String rideId,
     required LatLng userLocation,
   }) async {
-    final url = Uri.parse('$_baseUrl/rides/end');
-    try {
-      final Map<String, dynamic> requestBody = {
+    final response = await http.post(
+      Uri.parse('https://your-backend-url.com/api/rides/end'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
         'rideId': rideId,
         'userLocation': {
           'latitude': userLocation.latitude,
           'longitude': userLocation.longitude,
         },
-      };
+      }),
+    );
 
-      final response = await http.post(
-        url,
-        headers: _getHeaders(),
-        body: json.encode(requestBody),
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorBody = jsonDecode(response.body);
+      throw Exception(
+        errorBody['error'] ?? 'Unknown error (Status: ${response.statusCode})',
       );
-      print('End Ride API Response Status: ${response.statusCode}');
-      print('End Ride API Response Body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        final errorBody = json.decode(response.body);
-        throw Exception(
-          'Failed to end ride: ${errorBody['message'] ?? 'Unknown error'} (Status: ${response.statusCode})',
-        );
-      }
-    } catch (e) {
-      throw Exception('Error calling endRide API: $e');
     }
   }
 

@@ -59,4 +59,32 @@ class RideService {
       ).showSnackBar(SnackBar(content: Text('Error drawing route: $e')));
     }
   }
+
+  static Future<Map<String, dynamic>> endRide({
+    required String rideId,
+    required double latitude,
+    required double longitude,
+  }) async {
+    final url = Uri.parse(
+      'https://your-backend-url.com/api/rides/end',
+    ); // 🔁 Replace with your real backend URL
+
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'rideId': rideId,
+        'userLocation': {'latitude': latitude, 'longitude': longitude},
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorBody = jsonDecode(response.body);
+      throw Exception(
+        'Failed to end ride: ${errorBody['error'] ?? 'Unknown error'} (Status: ${response.statusCode})',
+      );
+    }
+  }
 }

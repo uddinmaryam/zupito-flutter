@@ -396,23 +396,17 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       return;
     }
 
-    // Determine the end location for the API call
     LatLng finalEndLocation = _activeBikeLocation!;
     String? endStationId;
     String returnMessage = '';
 
-    // Step 1: Check if near a required station
     final Station? nearbyStation = _isNearStation(finalEndLocation);
     if (nearbyStation != null) {
       endStationId = nearbyStation.id;
       returnMessage = '✅ Ride ended at ${nearbyStation.name} station!';
-    }
-    // Step 2: If not near a station, check if inside Lalitpur boundary
-    else if (_isPointInPolygon(finalEndLocation, _lalitpurBoundary)) {
+    } else if (_isPointInPolygon(finalEndLocation, _lalitpurBoundary)) {
       returnMessage = '✅ Ride ended successfully within Lalitpur boundary!';
-    }
-    // Step 3: If neither, show error and prevent end
-    else {
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -421,43 +415,62 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           backgroundColor: Colors.orange,
         ),
       );
-      // Re-activate timers if ride couldn't be ended
       _startRideCountdown();
       _startDummyBikeMovement();
-      return; // Stop here, do not call API
+      return;
     }
 
     try {
       final response = await _apiService.endRide(
         rideId: _activeRideId!,
         userLocation: finalEndLocation,
-        // REMOVED 'endStationId: endStationId' because ApiService's endRide no longer expects it
       );
 
-      if (response['success'] == true) {
+      if (response.containsKey('distance')) {
+        // ✅ Success case
+        final String distance = response['distance'] ?? 'N/A';
+        final int penaltyAmount = response['penaltyAmount'] ?? 0;
+        final String penaltyReason = response['penaltyReason'] ?? 'No penalty';
+        final double finalFare = (response['finalFare'] ?? 0).toDouble();
+
         setState(() {
           _isRideActive = false;
           _activeBikeCode = null;
           _activeRideId = null;
-          _activeBikeLocation = null; // Clear the bike's location
+          _activeBikeLocation = null;
           _rideEndTime = null;
           _remainingRideTime = Duration.zero;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(returnMessage), // Use dynamic message
-            backgroundColor: Colors.green,
-          ),
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('✅ Ride Ended Successfully'),
+              content: Text(
+                '$returnMessage\n\n'
+                '📏 Distance: ${response['distance'] ?? 'N/A'}\n'
+                '💰 Fare: Rs. ${response['finalFare'] ?? 0}\n'
+                '⚠️ Penalty: Rs. ${response['penaltyAmount'] ?? 0}\n'
+                '${response['penaltyReason'] != null ? 'Reason: ${response['penaltyReason']}' : ''}',
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('OK'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            );
+          },
         );
       } else {
-        final message = response['message'] ?? 'Ride could not be ended.';
+        final String message =
+            response['error'] ??
+            response['message'] ??
+            'Ride could not be ended.';
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('⚠️ Failed: $message')));
-        // If there's an API-side error but the app state still indicates active,
-        // (e.g., backend has more strict rules), re-enable timers.
         if (_isRideActive) {
-          // Check _isRideActive in case it was already set to false
           _startRideCountdown();
           _startDummyBikeMovement();
         }
@@ -467,13 +480,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('❌ Error: ${e.toString()}')));
-      // Re-enable timers if an exception occurred and ride is still conceptually active
       if (_isRideActive) {
         _startRideCountdown();
         _startDummyBikeMovement();
       }
     } finally {
-      await _loadStations(); // Always refresh stations to reflect bike availability changes
+      await _loadStations(); // Refresh stations
     }
   }
 
