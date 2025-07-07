@@ -10,8 +10,10 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
+import 'package:provider/provider.dart';
 import 'package:zupito/models/station.dart';
 import 'package:zupito/models/user.dart';
+import 'package:zupito/providers/theme_provider.dart';
 import 'package:zupito/services/api_service.dart';
 import 'package:zupito/services/otp_socket_service.dart';
 import 'package:zupito/services/secure_storage_services.dart';
@@ -48,8 +50,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   bool _isRideActive = false;
   String? _activeBikeCode;
   String? _activeRideId;
-  LatLng?
-  _activeBikeLocation; // This represents the *bike's* current position during a free-roam ride
+  LatLng? _activeBikeLocation;
+  List<LatLng> _routePoints = [];
+  int _routeIndex =
+      0; // This represents the *bike's* current position during a free-roam ride
   DateTime? _rideEndTime;
   Duration _remainingRideTime = Duration.zero;
   Timer? _rideCountdownTimer;
@@ -219,11 +223,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               size: 36,
             ),
           );
-          // For the dummy bike movement, we will keep it independent of user's _currentLocation
-          // unless the dummy movement is directly tied to user's location.
-          // Since you want "he can do anywhere it wants" for the bike, the dummy movement
-          // will simulate random movement from the bike's perspective, not necessarily tracking the user exactly.
-          // _activeBikeLocation is updated by _startDummyBikeMovement, not here.
         });
       }
     });
@@ -298,40 +297,32 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   }
 
   // This function will simulate random movement within a broader area for the bike
-  void _startDummyBikeMovement() {
+  void _startDummyBikeMovement() async {
     _dummyBikeMovementTimer?.cancel();
+    if (_activeBikeLocation == null || _destinationStation == null) return;
+
+    final start = _activeBikeLocation!;
+    final end = LatLng(_destinationStation!.lat, _destinationStation!.lng);
+
+    final route = await _fetchRoute(start, end);
+    if (route.isEmpty) return;
+
+    setState(() {
+      _routePoints = route;
+      _routeIndex = 0;
+    });
 
     _dummyBikeMovementTimer = Timer.periodic(const Duration(seconds: 5), (
       timer,
     ) {
-      if (!_isRideActive) {
+      if (_routeIndex >= _routePoints.length) {
         timer.cancel();
         return;
       }
+
       setState(() {
-        if (_activeBikeLocation != null) {
-          // Simulate movement by adding a small random offset
-          // These offsets are approximate to keep movement local but not fixed
-          double latOffset =
-              (_random.nextDouble() - 0.5) *
-              0.001; // +/- 0.0005 degrees (approx 55 meters)
-          double lngOffset = (_random.nextDouble() - 0.5) * 0.001;
-
-          LatLng newLocation = LatLng(
-            _activeBikeLocation!.latitude + latOffset,
-            _activeBikeLocation!.longitude + lngOffset,
-          );
-
-          // Optional: Restrict movement to a general area or Lalitpur boundary
-          // For truly "anywhere in Lalitpur", this might be less strict.
-          // For this dummy, we assume small increments keep it reasonably local.
-          _activeBikeLocation = newLocation;
-        } else if (_currentLocation != null) {
-          // Fallback: If activeBikeLocation somehow became null, re-initialize it
-          // This might happen if the ride was just started and _activeBikeLocation wasn't set yet.
-          _activeBikeLocation =
-              _currentLocation; // Using user location as a temporary start for dummy move
-        }
+        _activeBikeLocation = _routePoints[_routeIndex];
+        _routeIndex++;
       });
     });
   }
@@ -509,10 +500,26 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       backgroundColor: const Color(0xFFE8F0FE),
       appBar: AppBar(
         title: const Text("Explore Zupito Rides"),
-        backgroundColor: Colors.white,
-        elevation: 1,
-        foregroundColor: Colors.black,
+        actions: [
+          Consumer<ThemeProvider>(
+            builder: (context, themeProvider, _) {
+              return IconButton(
+                icon: Icon(
+                  themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
+                ),
+                onPressed: () {
+                  themeProvider.toggleTheme(!themeProvider.isDarkMode);
+                },
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.account_circle),
+            onPressed: () => Navigator.pushNamed(context, '/profile'),
+          ),
+        ],
       ),
+
       body: Stack(
         children: [
           _currentLocation == null
@@ -524,16 +531,24 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     TileLayer(
                       urlTemplate:
                           'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      retinaMode: RetinaMode.isHighDensity(context),
                       subdomains: const ['a', 'b', 'c'],
+                      userAgentPackageName: 'com.example.zupito',
                     ),
                     PolylineLayer(
+                      polylineCulling: false,
                       polylines: [
                         Polyline(
                           points: _lalitpurBoundary + [_lalitpurBoundary.first],
                           strokeWidth: 3,
                           color: Colors.deepOrange,
-                          isDotted: false,
                         ),
+                        if (_isRideActive && _routePoints.isNotEmpty)
+                          Polyline(
+                            points: _routePoints,
+                            strokeWidth: 4,
+                            color: Colors.green,
+                          ),
                       ],
                     ),
                     MarkerLayer(
@@ -670,5 +685,21 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         backgroundColor: Colors.deepOrange,
       ),
     );
+  }
+
+  Future<List<LatLng>> _fetchRoute(LatLng start, LatLng end) async {
+    final url = Uri.parse(
+      'http://router.project-osrm.org/route/v1/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?overview=full&geometries=geojson',
+    );
+
+    final response = await http.get(url);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final coords = data['routes'][0]['geometry']['coordinates'] as List;
+      return coords.map((p) => LatLng(p[1], p[0])).toList();
+    } else {
+      debugPrint('❌ Failed to fetch route');
+      return [];
+    }
   }
 }

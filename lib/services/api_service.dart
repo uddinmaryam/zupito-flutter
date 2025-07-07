@@ -95,9 +95,11 @@ class ApiService {
     required String rideId,
     required LatLng userLocation,
   }) async {
+    final url = Uri.parse('$_baseUrl/rides/end'); // ✅ Correct base URL used
+
     final response = await http.post(
-      Uri.parse('https://your-backend-url.com/api/rides/end'),
-      headers: {'Content-Type': 'application/json'},
+      url,
+      headers: _getHeaders(), // ✅ Use proper headers (with token if available)
       body: jsonEncode({
         'rideId': rideId,
         'userLocation': {
@@ -142,4 +144,29 @@ class ApiService {
       return null;
     }
   }
+
+Future<Map<String, dynamic>> fetchRideSummary(String userId) async {
+  final response = await http.get(
+    Uri.parse('$_baseUrl/rides/user/$userId/summary'),
+    headers: _getHeaders(),
+  );
+  if (response.statusCode == 200) {
+    return jsonDecode(response.body);
+  } else {
+    throw Exception('Failed to load ride summary');
+  }
+}
+
+Future<List<Map<String, dynamic>>> fetchRideHistory(String userId) async {
+  final response = await http.get(
+    Uri.parse('$_baseUrl/rides/user/$userId'),
+    headers: _getHeaders(),
+  );
+  if (response.statusCode == 200) {
+    final data = jsonDecode(response.body);
+    return List<Map<String, dynamic>>.from(data);
+  } else {
+    throw Exception('Failed to load ride history');
+  }
+}
 }

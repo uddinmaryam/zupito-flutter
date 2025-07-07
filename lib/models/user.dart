@@ -46,4 +46,6 @@ class UserProfile {
       'joinedDate': joinedDate.toIso8601String(),
     };
   }
+
+  static fromJsonString(String userData) {}
 }

@@ -48,5 +48,7 @@ class SecureStorageService {
     await _storage.delete(key: _userKey);
   }
 
+  Future<void> clear() async {}
+
 
 }
