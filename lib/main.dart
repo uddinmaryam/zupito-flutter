@@ -2,8 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
+// Admin Screens
 import 'package:zupito/admin/admin_home_screen.dart';
 import 'package:zupito/admin/admin_login_screen.dart';
+// NEW IMPORTS FOR ADMIN LIST SCREENS
+import 'package:zupito/admin/user_list_screen.dart';
+import 'package:zupito/admin/bike_list_screen.dart';
+import 'package:zupito/admin/station_list_screen.dart';
+import 'package:zupito/admin/ride_list_screen.dart';
+
+// User Screens
 import 'package:zupito/screens/profile_screen.dart';
 import 'package:zupito/screens/ride_history_screen.dart';
 import 'package:zupito/screens/map/map_screen.dart';
@@ -22,7 +30,9 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
   } catch (e) {
-    print('Firebase already initialized: $e');
+    // This catch block is useful if hot restart tries to re-initialize Firebase
+    // or if Firebase is already initialized by another part of the app.
+    print('Firebase initialization error (might be already initialized): $e');
   }
 
   runApp(
@@ -66,7 +76,11 @@ class MyApp extends StatelessWidget {
         '/history': (context) => const RideHistoryScreen(),
         '/admin-login': (context) => const AdminLoginScreen(),
         '/admin': (context) => const AdminHomeScreen(),
-        
+        // NEW: Admin List Screen Routes
+        '/users': (context) => const UserListScreen(),
+        '/bikes': (context) => const BikeListScreen(),
+        '/stations': (context) => const StationListScreen(),
+        '/rides': (context) => const RideListScreen(),
       },
     );
   }
