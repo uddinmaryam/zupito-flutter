@@ -145,6 +145,8 @@ class _LoginScreenState extends State<LoginScreen>
                     ),
                   ),
                   const SizedBox(height: 24),
+
+                  // ✅ Signup button
                   TextButton(
                     onPressed: () {
                       Navigator.push(
@@ -156,6 +158,20 @@ class _LoginScreenState extends State<LoginScreen>
                       "Don't have an account? Sign Up",
                       style: TextStyle(
                         color: Colors.indigo,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+
+                  // ✅ Admin login button
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/admin-login');
+                    },
+                    child: const Text(
+                      "Login as Admin",
+                      style: TextStyle(
+                        color: Colors.deepOrange,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
