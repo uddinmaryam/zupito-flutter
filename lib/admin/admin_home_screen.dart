@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dashboard_screen.dart';
 import 'user_list_screen.dart';
 import 'bike_list_screen.dart';
@@ -51,6 +52,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             _buildDrawerItem(Icons.pedal_bike, 'Bikes', 2),
             _buildDrawerItem(Icons.location_on, 'Stations', 3),
             _buildDrawerItem(Icons.history, 'Rides', 4),
+
+            // ✅ Logout item
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Logout'),
+              onTap: () async {
+                await logoutAdmin();
+                Navigator.pushReplacementNamed(context, '/admin-login');
+              },
+            ),
           ],
         ),
       ),
@@ -68,5 +80,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         Navigator.pop(context); // Close drawer
       },
     );
+  }
+
+  Future<void> logoutAdmin() async {
+    final storage = FlutterSecureStorage();
+    await storage.delete(key: 'admin_token');
   }
 }

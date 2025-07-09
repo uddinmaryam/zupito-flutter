@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+
 import 'package:zupito/admin/admin_home_screen.dart';
 import 'package:zupito/admin/admin_login_screen.dart';
 import 'package:zupito/screens/profile_screen.dart';
 import 'package:zupito/screens/ride_history_screen.dart';
-import 'firebase_options.dart';
-
 import 'package:zupito/screens/map/map_screen.dart';
 import 'package:zupito/screens/login_screen.dart';
 import 'package:zupito/screens/splash_screen.dart';
 import 'package:zupito/screens/phone_number_screen.dart';
+
 import 'package:provider/provider.dart';
 import 'providers/theme_provider.dart';
-import 'package:zupito/admin/dashboard_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,11 +64,9 @@ class MyApp extends StatelessWidget {
         '/phone': (context) => const PhoneNumberScreen(),
         '/profile': (context) => const ProfileScreen(),
         '/history': (context) => const RideHistoryScreen(),
-        '/admin': (context) => const AdminDashboardScreen(),
         '/admin-login': (context) => const AdminLoginScreen(),
-
         '/admin': (context) => const AdminHomeScreen(),
-
+        
       },
     );
   }
