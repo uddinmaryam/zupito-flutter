@@ -3,52 +3,63 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class SecureStorageService {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
-  // Keys
-  static const _tokenKey = 'auth_token';
-  static const _userKey = 'user';
-  static const _userIdKey = 'user_id';
+  // Keys for different types of stored data
+  static const _adminTokenKey =
+      'admin_auth_token'; // Explicitly for admin JWT token
+  static const _userAuthTokenKey =
+      'user_auth_token'; // Explicitly for user JWT token
+  static const _userProfileDataKey =
+      'user_profile_data'; // For the full user JSON profile
 
-  // Save token
-  Future<void> saveToken(String token) async {
-    await _storage.write(key: _tokenKey, value: token);
+  // --- Admin Token Methods ---
+  Future<void> writeAdminToken(String token) async {
+    await _storage.write(key: _adminTokenKey, value: token);
   }
 
-  // Get token
-  Future<String?> getToken() async {
-    return await _storage.read(key: _tokenKey);
+  Future<String?> readAdminToken() async {
+    return await _storage.read(key: _adminTokenKey);
   }
 
-  // Delete token
-  Future<void> deleteToken() async {
-    await _storage.delete(key: _tokenKey);
+  Future<void> deleteAdminToken() async {
+    await _storage.delete(key: _adminTokenKey);
   }
 
-  // Save user
-  Future<void> saveUser(String userJson) async {
-    await _storage.write(key: _userKey, value: userJson);
+  // --- User Authentication Token Methods ---
+  // This is for the JWT token received upon user login
+  Future<void> writeUserAuthToken(String token) async {
+    await _storage.write(key: _userAuthTokenKey, value: token);
   }
 
-  // Read user
-  Future<String?> readUser() async {
-    return await _storage.read(key: _userKey);
+  Future<String?> readUserAuthToken() async {
+    return await _storage.read(key: _userAuthTokenKey);
   }
 
-  // Save user ID
-  Future<void> saveUserId(String userId) async {
-    await _storage.write(key: _userIdKey, value: userId);
+  Future<void> deleteUserAuthToken() async {
+    await _storage.delete(key: _userAuthTokenKey);
   }
 
-  // Get user ID
-  Future<String?> getUserId() async {
-    return await _storage.read(key: _userIdKey);
+  // --- User Profile Data Methods (the full user JSON) ---
+  // This stores the full user object (e.g., {"_id": "...", "username": "...", "email": "..."})
+  Future<void> writeUserProfile(String userJson) async {
+    await _storage.write(key: _userProfileDataKey, value: userJson);
   }
 
-  // Delete user
-  Future<void> deleteUser() async {
-    await _storage.delete(key: _userKey);
+  Future<String?> readUserProfile() async {
+    return await _storage.read(key: _userProfileDataKey);
   }
 
-  Future<void> clear() async {}
+  Future<void> deleteUserProfile() async {
+    await _storage.delete(key: _userProfileDataKey);
+  }
 
+  // --- General Clear Method ---
+  // This will clear all relevant keys for a full logout/reset
+  Future<void> clearAllSecureData() async {
+    await _storage.delete(key: _adminTokenKey);
+    await _storage.delete(key: _userAuthTokenKey);
+    await _storage.delete(key: _userProfileDataKey);
+    // If you had any other specific keys like 'user_id', add them here too
+  }
 
+  Future readUser() async {}
 }

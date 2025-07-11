@@ -5,20 +5,23 @@ import 'package:zupito/services/secure_storage_services.dart';
 
 class AuthService {
   // ✅ Correct baseUrl using the real device-compatible local IP address
+  // This should point to your backend's auth base URL, e.g., 'http://your-backend-ip:port/api/v1/auth'
   static const String baseUrl = '$backendUrl/api/v1/auth';
 
   final SecureStorageService _secureStorage = SecureStorageService();
 
-  // 🔐 Login
-  // 🔐 Login
+  // 🔐 Login with Username and Password
   Future<Map<String, dynamic>?> login(String username, String password) async {
-    final url = Uri.parse('$baseUrl/login');
+    final url = Uri.parse('$baseUrl/login'); // Endpoint for login
 
     try {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'username': username, 'password': password}),
+        body: jsonEncode({
+          'username': username,
+          'password': password,
+        }), // Sending username and password
       );
 
       if (response.statusCode == 200) {
@@ -26,19 +29,14 @@ class AuthService {
         print("✅ Login successful. Response data: $data");
 
         final token = data['token'];
-        final user = data['user'];
+        final user = data['user']; // This 'user' should be the full user JSON
 
         if (token != null && user != null) {
-          // ✅ Save token
-          await _secureStorage.saveToken(token);
+          await _secureStorage.writeUserAuthToken(token);
+          await _secureStorage.writeUserProfile(jsonEncode(user));
 
-          // ✅ Save user ID (or username as fallback)
-          await _secureStorage.saveUserId(user['_id'] ?? username);
+          // Removed saveUserId as user ID is part of the user profile now.
 
-          // ✅ Save full user JSON
-          await _secureStorage.saveUser(jsonEncode(user));
-
-          // ✅ Return both token and user
           return {'token': token, 'user': user};
         } else {
           print("❌ Token or user is missing in response.");

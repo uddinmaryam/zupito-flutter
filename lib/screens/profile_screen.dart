@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:zupito/services/api_service.dart';
 import 'package:zupito/services/secure_storage_services.dart';
-import 'package:zupito/models/user.dart';
+import 'package:zupito/models/user.dart'; // Correctly imports the 'User' class
 import 'package:provider/provider.dart';
 import 'package:zupito/providers/theme_provider.dart';
 
@@ -15,7 +15,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final SecureStorageService _secureStorage = SecureStorageService();
-  UserProfile? _user;
+  User? _user; // FIX: Changed UserProfile to User
   int _totalRides = 0;
   String _totalDistance = '0 km';
   int _totalPenalty = 0;
@@ -30,24 +30,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final data = await _secureStorage.readUser();
     if (data != null) {
       final jsonData = jsonDecode(data);
-      final user = UserProfile.fromJson(jsonData);
+      final user = User.fromJson(
+        jsonData,
+      ); // FIX: Changed UserProfile.fromJson to User.fromJson
       setState(() => _user = user);
 
       try {
-        final summary = await ApiService().fetchRideSummary(user.id.toString());
-        setState(() {
-          _totalRides = summary['totalRides'];
-          _totalDistance = summary['totalDistance'];
-          _totalPenalty = summary['totalPenalty'];
-        });
+        // Ensure user.id is not null before using toString()
+        if (user.id != null) {
+          final summary = await ApiService().fetchRideSummary(
+            user.id.toString(),
+          );
+          setState(() {
+            _totalRides = summary['totalRides'] ?? 0; // Provide default if null
+            _totalDistance =
+                summary['totalDistance'] ?? '0 km'; // Provide default if null
+            _totalPenalty =
+                summary['totalPenalty'] ?? 0; // Provide default if null
+          });
+        } else {
+          debugPrint("❌ User ID is null, cannot fetch ride summary.");
+        }
       } catch (e) {
         debugPrint("❌ Error fetching ride summary: $e");
+        // Optionally show a snackbar to the user
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Error loading ride summary: ${e.toString()}"),
+            ),
+          );
+        }
+      }
+    } else {
+      // If user data is null, it means the user is not logged in or token expired.
+      // Redirect to login.
+      debugPrint(
+        "User data not found in secure storage. Redirecting to login.",
+      );
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/login');
       }
     }
   }
 
   void _logout() async {
-    await _secureStorage.clear();
+    // FIX: Use the correct clear method from SecureStorageService
+    await _secureStorage
+        .clearAllSecureData(); // Assuming this clears all tokens and user data
     if (!mounted) return;
     Navigator.pushReplacementNamed(
       context,
@@ -83,7 +113,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        _user!.name,
+                        _user!.name ?? 'N/A', // FIX: Add null-aware operator
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
@@ -91,7 +121,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const SizedBox(height: 5),
                       Text(
-                        _user!.email,
+                        _user!.email ?? 'N/A', // FIX: Add null-aware operator
                         style: const TextStyle(
                           fontSize: 16,
                           color: Colors.grey,
@@ -117,7 +147,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         trailing: Text('Rs. $_totalPenalty'),
                         onTap: () => Navigator.pushNamed(context, '/history'),
                       ),
-                     
+
                       ListTile(
                         leading: const Icon(Icons.nightlight_round),
                         title: const Text("Dark Mode"),

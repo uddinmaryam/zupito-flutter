@@ -39,6 +39,10 @@ class Bike {
 
   get status => null;
 
+  get assignedStation => null;
+
+  get location => null;
+
   Map<String, dynamic> toJson() {
     return {
       'code': code,

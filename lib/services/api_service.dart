@@ -3,11 +3,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
-import '../models/station.dart';
-// If you have these models and they are used, keep these imports.
-// If not, you might not need them, but it's generally safer to keep if they exist.
-// import '../models/bike.dart';
-// import '../models/user.dart';
+import 'package:zupito/models/bike.dart'; // Ensure this import is correct
+import 'package:zupito/models/station.dart'; // Ensure this import is correct
+import 'package:zupito/models/user.dart'; // Ensure this import is correct
 
 class ApiService {
   static const String _baseUrl =
@@ -157,14 +155,12 @@ class ApiService {
 
   Future<Map<String, dynamic>> fetchRideSummary(String userId) async {
     final response = await http.get(
-      // This is the correct URL for fetching the ride summary (totalRides, totalDistance, totalPenalty)
       Uri.parse('$_baseUrl/rides/user/$userId/summary'),
       headers: _getHeaders(),
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
-      // It's good practice to include more details in the exception for debugging
       String errorMessage = 'Unknown error';
       try {
         final errorBody = jsonDecode(response.body);
@@ -181,24 +177,18 @@ class ApiService {
 
   Future<List<Map<String, dynamic>>> fetchRideHistory(String userId) async {
     final url = Uri.parse('$_baseUrl/rides/user/$userId/history');
-    print('Attempting to fetch ride history from URL: $url'); // New debug print
+    print('Attempting to fetch ride history from URL: $url');
     try {
       final response = await http.get(url, headers: _getHeaders());
 
-      print(
-        'Ride History API Response Status: ${response.statusCode}',
-      ); // New debug print
-      print(
-        'Ride History API Response Body: ${response.body}',
-      ); // New debug print
+      print('Ride History API Response Status: ${response.statusCode}');
+      print('Ride History API Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        // Ensure data is indeed a List, as per Postman screenshot
         if (data is List) {
           return List<Map<String, dynamic>>.from(data);
         } else {
-          // If the response is not a List, it's an unexpected format
           print(
             'Ride History API: Expected a List, but received: ${data.runtimeType}',
           );
@@ -207,7 +197,6 @@ class ApiService {
           );
         }
       } else {
-        // Parse the error body if available
         String errorMessage = 'Unknown error';
         try {
           final errorBody = jsonDecode(response.body);
@@ -221,15 +210,14 @@ class ApiService {
         );
       }
     } catch (e) {
-      print(
-        'Error in fetchRideHistory API call: $e',
-      ); // Catch network or parsing errors
-      throw Exception(
-        'Error calling fetchRideHistory API: $e',
-      ); // Re-throw with more context
+      print('Error in fetchRideHistory API call: $e');
+      throw Exception('Error calling fetchRideHistory API: $e');
     }
   }
 
+  // REMOVED: The login method that took phone and OTP.
+  // This responsibility is now solely with AuthService.
+  /*
   Future<Map<String, dynamic>> login({
     required String phone,
     required String otp,
@@ -252,6 +240,35 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Error during login: $e');
+    }
+  }
+  */
+
+  Future<List<Bike>> getBikes() async {
+    final url = Uri.parse('$_baseUrl/bikes');
+
+    try {
+      final response = await http.get(url, headers: _getHeaders());
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonMap = json.decode(response.body);
+        final List<dynamic> jsonList = jsonMap['bikes'];
+
+        print('--- Raw JSON Response for all Bikes from getBikes ---');
+        print(jsonEncode(jsonMap));
+        print('----------------------------------------------------');
+
+        return jsonList
+            .map((jsonItem) => Bike.fromJson(jsonItem as Map<String, dynamic>))
+            .toList();
+      } else {
+        final errorBody = json.decode(response.body);
+        throw Exception(
+          'Failed to load bikes: ${errorBody['message'] ?? 'Unknown error'} (Status: ${response.statusCode})',
+        );
+      }
+    } catch (e) {
+      throw Exception('Error calling getBikes API: $e');
     }
   }
 }

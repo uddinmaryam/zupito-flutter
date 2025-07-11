@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../services/secure_storage_services.dart';
 import 'signup_screen.dart';
 import '../services/otp_socket_service.dart';
+import 'package:zupito/api/api_config.dart'; // Import api_config to check backendUrl
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -46,40 +47,62 @@ class _LoginScreenState extends State<LoginScreen>
     final username = _usernameController.text.trim();
     final password = _passwordController.text.trim();
 
+    print(
+      "DEBUG: Login button pressed. Username: $username, Password: $password",
+    );
+
     if (username.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter username and password')),
       );
+      print("DEBUG: Username or password is empty.");
       return;
     }
 
+    // DEBUG: Print the backend URL being used
+    print(
+      "DEBUG: Attempting login to backend URL: ${AuthService.baseUrl}/login",
+    );
+    print("DEBUG: Backend URL from api_config: $backendUrl");
+
     try {
       final result = await authService.login(username, password);
+      print("DEBUG: Auth service login call completed. Result: $result");
 
       if (result != null && result['token'] != null && result['user'] != null) {
-        await _secureStorage.saveToken(result['token']);
-        await _secureStorage.saveUser(jsonEncode(result['user']));
+        print("DEBUG: Login successful. Saving token and user profile.");
+        await _secureStorage.writeUserAuthToken(result['token']);
+        await _secureStorage.writeUserProfile(jsonEncode(result['user']));
 
         final userId = result['user']['_id'] ?? result['user']['id'];
         if (userId != null) {
-          print('📡 Connecting socket for userId: $userId');
-          OtpSocketService().connect(userId, context: context);
+          print('DEBUG: Connecting socket for userId: $userId');
+          OtpSocketService().connect(userId.toString(), context: context);
+        } else {
+          print("DEBUG: User ID is null after login.");
         }
 
-        if (!mounted) return;
+        if (!mounted) {
+          print("DEBUG: Widget not mounted, cannot navigate.");
+          return;
+        }
+        print("DEBUG: Navigating to MapScreen.");
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const MapScreen()),
         );
       } else {
+        print("DEBUG: Login failed. Result was null or missing token/user.");
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Login failed. Check credentials.')),
         );
       }
     } catch (e) {
-      print("❌ Login exception: $e");
+      print("DEBUG: ❌ Login exception caught: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('An error occurred during login.')),
+        SnackBar(
+          content: Text('An error occurred during login: ${e.toString()}'),
+        ),
       );
     }
   }
@@ -128,7 +151,7 @@ class _LoginScreenState extends State<LoginScreen>
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
-                        print("✅ Button pressed");
+                        print("DEBUG: ElevatedButton onPressed called.");
                         _handleUsernamePasswordLogin();
                       },
                       style: ElevatedButton.styleFrom(
@@ -145,8 +168,6 @@ class _LoginScreenState extends State<LoginScreen>
                     ),
                   ),
                   const SizedBox(height: 24),
-
-                  // ✅ Signup button
                   TextButton(
                     onPressed: () {
                       Navigator.push(
@@ -162,8 +183,7 @@ class _LoginScreenState extends State<LoginScreen>
                       ),
                     ),
                   ),
-
-                  // ✅ Admin login button
+                  const SizedBox(height: 16),
                   TextButton(
                     onPressed: () {
                       Navigator.pushNamed(context, '/admin-login');
@@ -171,7 +191,7 @@ class _LoginScreenState extends State<LoginScreen>
                     child: const Text(
                       "Login as Admin",
                       style: TextStyle(
-                        color: Colors.deepOrange,
+                        color: Colors.blueAccent,
                         fontWeight: FontWeight.bold,
                       ),
                     ),

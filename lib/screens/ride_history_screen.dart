@@ -17,6 +17,7 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
   final SecureStorageService _secureStorage = SecureStorageService();
   List<Map<String, dynamic>> rideHistory = [];
   bool _isLoading = true;
+  String? _error; // Added error state
 
   @override
   void initState() {
@@ -25,33 +26,31 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
   }
 
   Future<void> _fetchRideHistory() async {
+    setState(() {
+      _isLoading = true;
+      _error = null; // Clear previous errors
+    });
     debugPrint("Attempting to fetch user data for ride history...");
-    final data = await _secureStorage.readUser();
-    if (data != null) {
-      debugPrint("User data found: $data");
-      final jsonData = jsonDecode(data);
-      final user = UserProfile.fromJson(jsonData);
+    try {
+      final data = await _secureStorage.readUser();
+      if (data != null) {
+        debugPrint("User data found: $data");
+        final jsonData = jsonDecode(data);
+        // FIX: Change UserProfile.fromJson to User.fromJson
+        final user = User.fromJson(jsonData); // Use your custom User model
 
-      debugPrint(
-        "User ID for API call: ${user.id}",
-      ); // Check the actual user ID being used
+        debugPrint("User ID for API call: ${user.id}");
 
-      try {
         final rides = await ApiService().fetchRideHistory(user.id);
-        debugPrint(
-          "API returned ${rides.length} rides.",
-        ); // Check how many rides came back
+        debugPrint("API returned ${rides.length} rides.");
 
-        // ✅ Sort newest first
-        // Add a check to ensure 'startTime' exists before parsing
+        // Sort newest first
         rides.sort((a, b) {
           final startTimeA = a['startTime'];
           final startTimeB = b['startTime'];
 
           if (startTimeA == null || startTimeB == null) {
-            // Handle cases where startTime might be missing,
-            // perhaps by placing rides with missing times at the end
-            return 0; // Or define a custom sorting logic for nulls
+            return 0;
           }
           return DateTime.parse(
             startTimeB,
@@ -60,21 +59,30 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
 
         setState(() {
           rideHistory = rides;
-          _isLoading = false;
         });
         debugPrint(
           "Ride history state updated. Total rides: ${rideHistory.length}",
         );
-      } catch (e) {
+      } else {
         debugPrint(
-          "❌ Error fetching rides in RideHistoryScreen: $e",
-        ); // Pay attention to this error
-        setState(() => _isLoading = false);
+          "No user data found in secure storage. Cannot fetch ride history.",
+        );
+        setState(() {
+          _error = 'User not logged in. Please log in to view history.';
+        });
       }
-    } else {
-      debugPrint(
-        "No user data found in secure storage. Cannot fetch ride history.",
-      );
+    } catch (e) {
+      debugPrint("❌ Error fetching rides in RideHistoryScreen: $e");
+      setState(() {
+        _error =
+            'Failed to load ride history: ${e.toString().replaceFirst('Exception: ', '')}';
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_error!)));
+      }
+    } finally {
       setState(() => _isLoading = false);
     }
   }
@@ -88,6 +96,20 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(_error!, textAlign: TextAlign.center),
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                    onPressed: _fetchRideHistory,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            )
           : rideHistory.isEmpty
           ? const Center(child: Text("No ride history found."))
           : ListView.builder(
@@ -96,18 +118,23 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
               itemBuilder: (context, index) {
                 final ride = rideHistory[index];
                 // Add debug prints for individual ride data
-                debugPrint('Displaying Ride: $ride'); // See the full ride map
+                debugPrint('Displaying Ride: $ride');
                 debugPrint(
-                  'Start Station: ${ride['startStation']}, End Station: ${ride['endStation']}',
-                );
+                  'Start Station: ${ride['startStation']}, End Station: ${ride['destinationStation']}',
+                ); // Use destinationStation
                 debugPrint(
                   'Start Time: ${ride['startTime']}, End Time: ${ride['endTime']}',
                 );
 
-                final start = ride['startStation'] ?? 'Unknown';
-                final end = ride['endStation'] ?? 'Unknown';
-                final fare = ride['fare'] ?? 0;
-                final penalty = ride['penalty'] ?? 0;
+                // Access populated fields correctly
+                final startStationName =
+                    ride['startStation']?['name'] ?? 'Unknown';
+                final destinationStationName =
+                    ride['destinationStation']?['name'] ?? 'Unknown';
+                final fare = (ride['fare'] as num?)?.toDouble() ?? 0.0;
+                final penalty =
+                    (ride['penaltyAmount'] as num?)?.toDouble() ??
+                    0.0; // Use penaltyAmount
 
                 // Safely parse startTime
                 DateTime? startTime;
@@ -124,7 +151,7 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                 final endTimeStr = ride['endTime'];
                 String durationStr = '';
 
-                // ✅ Calculate ride duration if ended and times are valid
+                // Calculate ride duration if ended and times are valid
                 if (startTime != null && endTimeStr is String) {
                   try {
                     final endTime = DateTime.parse(endTimeStr);
@@ -153,7 +180,9 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                       size: 30,
                       color: Colors.indigo,
                     ),
-                    title: Text('$start → $end'),
+                    title: Text(
+                      '$startStationName → $destinationStationName',
+                    ), // Use populated names
                     subtitle: Text(
                       '📅 $dateStr${durationStr.isNotEmpty ? '\n$durationStr' : ''}',
                     ),
