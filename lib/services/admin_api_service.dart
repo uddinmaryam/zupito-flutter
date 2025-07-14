@@ -32,12 +32,13 @@ class AdminApiService {
     return _handleResponse(response);
   }
 
-  static Future<dynamic> _post(String path, Map<String, dynamic> body) async {
+  static Future<dynamic> _post(String path,
+      [Map<String, dynamic>? body]) async {
     final headers = await _getAuthHeaders();
     final response = await http.post(
       Uri.parse('$baseUrl$path'),
       headers: headers,
-      body: jsonEncode(body), // Use jsonEncode here
+      body: body == null ? null : jsonEncode(body), // Use jsonEncode here
     );
     return _handleResponse(response);
   }
@@ -149,8 +150,7 @@ class AdminApiService {
 
 // Approve user
   static Future<void> approveUser(String userId) async {
-    // No body needed, so pass empty map for POST
-    await _post('/approve-user/$userId', {});
+    await _post('/approve-user/$userId');
   }
 
 // Reject user

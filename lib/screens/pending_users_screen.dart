@@ -77,19 +77,29 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
                       itemBuilder: (context, index) {
                         final user = pendingUsers[index];
                         return ListTile(
-                          leading: const Icon(Icons.person),
+                          leading: (user['citizenshipImage'] != null &&
+                                  user['citizenshipImage'] != "")
+                              ? CircleAvatar(
+                                  radius: 26,
+                                  backgroundImage:
+                                      NetworkImage(user['citizenshipImage']),
+                                  backgroundColor: Colors.grey[200],
+                                )
+                              : const Icon(Icons.person, size: 32),
                           title: Text(user['username'] ?? 'No Name'),
                           subtitle: Text(user['email'] ?? ''),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.check, color: Colors.green),
+                                icon: const Icon(Icons.check,
+                                    color: Colors.green),
                                 tooltip: 'Approve',
                                 onPressed: () => approveUser(user['_id']),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.close, color: Colors.red),
+                                icon:
+                                    const Icon(Icons.close, color: Colors.red),
                                 tooltip: 'Reject',
                                 onPressed: () => rejectUser(user['_id']),
                               ),
