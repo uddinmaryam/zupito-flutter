@@ -11,11 +11,9 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:zupito/models/station.dart';
 import 'package:zupito/models/user.dart';
 import 'package:zupito/providers/theme_provider.dart';
-import 'package:zupito/screens/map/esewa_payment_screen.dart';
 import 'package:zupito/services/api_service.dart';
 import 'package:zupito/services/otp_socket_service.dart';
 import 'package:zupito/services/secure_storage_services.dart';
@@ -995,6 +993,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
     // Handle case where user profile couldn't be loaded (e.g., bad token)
     if (_userProfile == null) {
+      // This should ideally be handled by the _initialize redirect, but as a fallback:
       debugPrint(
         "WARN: _userProfile is null in build. Displaying login message.",
       );
@@ -1029,6 +1028,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       appBar: AppBar(
         title: const Text("Explore Zupito Rides"),
         backgroundColor: Colors.indigo,
+        
         actions: [
           Consumer<ThemeProvider>(
             builder: (context, themeProvider, _) {
@@ -1048,6 +1048,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           ),
         ],
       ),
+
       body: _currentLocation == null
           ? const Center(
               child: Column(
@@ -1066,26 +1067,39 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               children: [
                 FlutterMap(
                   mapController: _mapController,
-                  options: MapOptions(center: _currentLocation!, zoom: 15),
+                  options: MapOptions(
+                    center: _currentLocation!,
+                    zoom: 15,
+                    // Interactive Flags: Only allow necessary interactions if the map feels "stuck"
+                    // interactiveFlags: InteractiveFlag.all & ~InteractiveFlag.rotate, // Example: disable rotation
+                  ),
                   children: [
                     TileLayer(
+                      // This is the standard OpenStreetMap tile server.
+                      // If your map is blank, double-check device internet connectivity
+                      // or network/firewall issues blocking access to this URL.
                       urlTemplate:
                           'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                       retinaMode: RetinaMode.isHighDensity(context),
                       subdomains: const ['a', 'b', 'c'],
-                      userAgentPackageName: 'com.example.zupito',
+                      userAgentPackageName:
+                          'com.example.zupito', // Important for some tile providers
                       errorImage: const AssetImage(
                         'assets/images/placeholder_map.png',
-                      ),
+                      ), // Optional: show a fallback image on tile load error
                     ),
                     PolylineLayer(
                       polylineCulling: false,
                       polylines: [
                         Polyline(
-                          points: _lalitpurBoundary + [_lalitpurBoundary.first],
+                          points:
+                              _lalitpurBoundary +
+                              [_lalitpurBoundary.first], // Close the polygon
                           strokeWidth: 3,
                           color: Colors.red,
                           isDotted: true,
+                          // borderColor: Colors.deepOrange, // No borderColor property for Polyline
+                          // borderStrokeWidth: 1.5,
                         ),
                       ],
                     ),
@@ -1103,7 +1117,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                                 size: 40,
                                 color: station.bikes.isNotEmpty
                                     ? Colors.indigo
-                                    : Colors.grey,
+                                    : Colors.grey, // Grey if no bikes
                               ),
                             ),
                           ),
@@ -1124,19 +1138,22 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       color: Colors.blue.withOpacity(
-                                        1 - _rippleController.value,
+                                        1 -
+                                            _rippleController
+                                                .value, // Fade out as it expands
                                       ),
                                     ),
                                   ),
                                 ),
                                 const Icon(
-                                  Icons.person_pin_circle,
+                                  Icons.person_pin_circle, // User location icon
                                   size: 36,
                                   color: Colors.blue,
                                 ),
                               ],
                             ),
                           ),
+
                         if (_isRideActive && _activeBikeLocation != null)
                           Marker(
                             point: _activeBikeLocation!,
@@ -1153,13 +1170,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       color: Colors.green.withOpacity(
-                                        1 - _rippleController.value,
+                                        1 -
+                                            _rippleController
+                                                .value, // Fade out as it expands
                                       ),
                                     ),
                                   ),
                                 ),
                                 const Icon(
-                                  Icons.pedal_bike,
+                                  Icons.pedal_bike, // Bike icon
                                   size: 36,
                                   color: Colors.black,
                                 ),
@@ -1170,7 +1189,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     ),
                   ],
                 ),
-
                 // Ride active overlay
                 if (_isRideActive)
                   Positioned(
@@ -1232,41 +1250,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       ),
                     ),
                   ),
-
-                // eSewa Payment Button - only visible if station selected & ride NOT active
-                if (_selectedStation != null && !_isRideActive)
-                  Positioned(
-                    bottom: 90,
-                    left: 30,
-                    right: 30,
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.payment),
-                      label: const Text('Pay with eSewa'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => EsewaPaymentScreen(
-                              amount: '100',
-                              pid:
-                                  'ride_${DateTime.now().millisecondsSinceEpoch}',
-                              merchant: 'EPAYTEST',
-                              successUrl: 'https://esewa.com.np/success',
-                              failureUrl: 'https://esewa.com.np/fail',
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
               ],
             ),
 
@@ -1275,17 +1258,23 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         icon: const Icon(Icons.navigation),
         label: const Text("Nearest Station"),
         backgroundColor: Colors.indigo,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(30),
+        ), // More modern look
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButtonLocation:
+          FloatingActionButtonLocation.endFloat, // Place at bottom-right
     );
   }
 }
 
-extension FirstWhereOrNullExtension<E> on Iterable<E> {
-  E? firstWhereOrNull(bool Function(E element) test) {
+// Extension to add firstWhereOrNull functionality similar to Kotlin/C#
+extension IterableExt<T> on Iterable<T> {
+  T? firstWhereOrNull(bool Function(T element) test) {
     for (var element in this) {
-      if (test(element)) return element;
+      if (test(element)) {
+        return element;
+      }
     }
     return null;
   }

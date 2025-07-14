@@ -26,8 +26,7 @@ Widget buildStationBottomSheet(
     String rideId,
     DateTime rideEndTime,
     LatLng bikeStartLocation,
-  )
-  onRideStartConfirmed,
+  ) onRideStartConfirmed,
 }) {
   return DraggableScrollableSheet(
     expand: false,
@@ -53,8 +52,7 @@ class _StationBottomSheetContent extends StatefulWidget {
     String rideId,
     DateTime rideEndTime,
     LatLng bikeStartLocation,
-  )
-  onRideStartConfirmed;
+  ) onRideStartConfirmed;
   final ScrollController scrollController;
   final ApiService apiService;
 
@@ -114,12 +112,10 @@ class _StationBottomSheetContentState
 
   @override
   Widget build(BuildContext context) {
-    final availableBikes = _fullBikesInStation
-        .where((b) => b.isAvailable)
-        .toList();
-    final unavailableBikes = _fullBikesInStation
-        .where((b) => !b.isAvailable)
-        .toList();
+    final availableBikes =
+        _fullBikesInStation.where((b) => b.isAvailable).toList();
+    final unavailableBikes =
+        _fullBikesInStation.where((b) => !b.isAvailable).toList();
 
     return Container(
       decoration: const BoxDecoration(
@@ -158,84 +154,84 @@ class _StationBottomSheetContentState
             _bikesLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _bikesError != null
-                ? Center(
-                    child: Text(
-                      _bikesError!,
-                      style: const TextStyle(color: Colors.red),
-                      textAlign: TextAlign.center,
-                    ),
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Available Bikes (${availableBikes.length})',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
+                    ? Center(
+                        child: Text(
+                          _bikesError!,
+                          style: const TextStyle(color: Colors.red),
+                          textAlign: TextAlign.center,
                         ),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Available Bikes (${availableBikes.length})',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          if (availableBikes.isEmpty)
+                            const Center(child: Text('No bikes available.'))
+                          else
+                            Wrap(
+                              runSpacing: 12,
+                              children: availableBikes
+                                  .map(
+                                    (bike) => _BikeCard(
+                                      bike: bike,
+                                      isAvailable: true,
+                                      onRefresh: refreshSheet,
+                                      onRideStartConfirmed:
+                                          widget.onRideStartConfirmed,
+                                      stationStartLocation: LatLng(
+                                        widget.station.latitude,
+                                        widget.station.longitude,
+                                      ),
+                                      startStationId: widget.station.id,
+                                      station: widget.station,
+                                      apiService: widget.apiService,
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          const SizedBox(height: 20),
+                          Text(
+                            'Unavailable Bikes (${unavailableBikes.length})',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.red,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          if (unavailableBikes.isEmpty)
+                            const Center(child: Text('No unavailable bikes.'))
+                          else
+                            Wrap(
+                              runSpacing: 12,
+                              children: unavailableBikes
+                                  .map(
+                                    (bike) => _BikeCard(
+                                      bike: bike,
+                                      isAvailable: false,
+                                      onRefresh: refreshSheet,
+                                      onRideStartConfirmed:
+                                          widget.onRideStartConfirmed,
+                                      stationStartLocation: LatLng(
+                                        widget.station.latitude,
+                                        widget.station.longitude,
+                                      ),
+                                      startStationId: widget.station.id,
+                                      station: widget.station,
+                                      apiService: widget.apiService,
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                        ],
                       ),
-                      const SizedBox(height: 10),
-                      if (availableBikes.isEmpty)
-                        const Center(child: Text('No bikes available.'))
-                      else
-                        Wrap(
-                          runSpacing: 12,
-                          children: availableBikes
-                              .map(
-                                (bike) => _BikeCard(
-                                  bike: bike,
-                                  isAvailable: true,
-                                  onRefresh: refreshSheet,
-                                  onRideStartConfirmed:
-                                      widget.onRideStartConfirmed,
-                                  stationStartLocation: LatLng(
-                                    widget.station.latitude,
-                                    widget.station.longitude,
-                                  ),
-                                  startStationId: widget.station.id,
-                                  station: widget.station,
-                                  apiService: widget.apiService,
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      const SizedBox(height: 20),
-                      Text(
-                        'Unavailable Bikes (${unavailableBikes.length})',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.red,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      if (unavailableBikes.isEmpty)
-                        const Center(child: Text('No unavailable bikes.'))
-                      else
-                        Wrap(
-                          runSpacing: 12,
-                          children: unavailableBikes
-                              .map(
-                                (bike) => _BikeCard(
-                                  bike: bike,
-                                  isAvailable: false,
-                                  onRefresh: refreshSheet,
-                                  onRideStartConfirmed:
-                                      widget.onRideStartConfirmed,
-                                  stationStartLocation: LatLng(
-                                    widget.station.latitude,
-                                    widget.station.longitude,
-                                  ),
-                                  startStationId: widget.station.id,
-                                  station: widget.station,
-                                  apiService: widget.apiService,
-                                ),
-                              )
-                              .toList(),
-                        ),
-                    ],
-                  ),
             const SizedBox(height: 30),
             Center(
               child: TextButton.icon(
@@ -260,8 +256,7 @@ class _BikeCard extends StatefulWidget {
     String rideId,
     DateTime rideEndTime,
     LatLng bikeStartLocation,
-  )?
-  onRideStartConfirmed;
+  )? onRideStartConfirmed;
   final LatLng stationStartLocation;
   final String startStationId;
   final Station station;
@@ -301,9 +296,8 @@ class _BikeCardState extends State<_BikeCard> {
       final allStations = await widget.apiService.getStations();
       if (!mounted) return;
 
-      final List<Station> otherStations = allStations
-          .where((s) => s.id != widget.startStationId)
-          .toList();
+      final List<Station> otherStations =
+          allStations.where((s) => s.id != widget.startStationId).toList();
 
       List<Station> allSelectable = [...otherStations];
 
@@ -496,17 +490,17 @@ class _BikeCardState extends State<_BikeCard> {
       final double initialEstimatedCost = duration * _pricePerMinute;
       final LatLng confirmedBikeStartLocation = widget.stationStartLocation;
 
-      final Map<String, dynamic> responseData = await widget.apiService
-          .startRide(
-            userId: userId,
-            bikeId: bike.id,
-            selectedDuration: duration,
-            startStationId: widget.startStationId,
-            destinationStationId: destinationStationId,
-            estimatedCost: initialEstimatedCost,
-            startLat: confirmedBikeStartLocation.latitude,
-            startLng: confirmedBikeStartLocation.longitude,
-          );
+      final Map<String, dynamic> responseData =
+          await widget.apiService.startRide(
+        userId: userId,
+        bikeId: bike.id,
+        selectedDuration: duration,
+        startStationId: widget.startStationId,
+        destinationStationId: destinationStationId,
+        estimatedCost: initialEstimatedCost,
+        startLat: confirmedBikeStartLocation.latitude,
+        startLng: confirmedBikeStartLocation.longitude,
+      );
 
       final String rideId = responseData['rideId'] ?? '';
       final String bikeCode = bike.code ?? 'Unknown';
@@ -655,11 +649,11 @@ class _BikeCardState extends State<_BikeCard> {
         subtitle: Text(subtitleText),
         trailing: widget.isAvailable
             ? (_loading
-                  ? const CircularProgressIndicator()
-                  : ElevatedButton(
-                      onPressed: _handleUnlock,
-                      child: const Text('Unlock'),
-                    ))
+                ? const CircularProgressIndicator()
+                : ElevatedButton(
+                    onPressed: _handleUnlock,
+                    child: const Text('Unlock'),
+                  ))
             : const Icon(Icons.lock, color: Colors.red),
       ),
     );

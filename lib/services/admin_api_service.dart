@@ -141,4 +141,20 @@ class AdminApiService {
   static Future<void> logout() async {
     await _storage.delete(key: 'admin_token');
   }
+
+// Fetch pending users
+  static Future<List<dynamic>> fetchPendingUsers() async {
+    return await _get('/pending-users');
+  }
+
+// Approve user
+  static Future<void> approveUser(String userId) async {
+    // No body needed, so pass empty map for POST
+    await _post('/approve-user/$userId', {});
+  }
+
+// Reject user
+  static Future<void> rejectUser(String userId) async {
+    await _delete('/reject-user/$userId');
+  }
 }
