@@ -57,22 +57,25 @@ class _UserListScreenState extends State<UserListScreen> {
   Widget build(BuildContext context) {
     // Removed AppBar as it's handled by AdminHomeScreen
     return RefreshIndicator(
-      // Added RefreshIndicator for pull-to-refresh
       onRefresh: _fetchUsers,
       child: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
           ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(_error!, textAlign: TextAlign.center),
-                  const SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: _fetchUsers,
-                    child: const Text('Retry'),
-                  ),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min, // Important!
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(_error!, textAlign: TextAlign.center),
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: _fetchUsers,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
               ),
             )
           : _users.isEmpty

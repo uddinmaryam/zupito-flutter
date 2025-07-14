@@ -37,13 +37,15 @@ class _BikeListScreenState extends State<BikeListScreen> {
       });
     } catch (e) {
       setState(() {
-        _error = 'Failed to fetch bikes: ${e.toString().replaceFirst('Exception: ', '')}';
+        _error =
+            'Failed to fetch bikes: ${e.toString().replaceFirst('Exception: ', '')}';
       });
       print('Error fetching bikes: $e'); // Log the error for debugging
-      if (mounted) { // Check if the widget is still in the tree
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_error!)),
-        );
+      if (mounted) {
+        // Check if the widget is still in the tree
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_error!)));
       }
     } finally {
       setState(() {
@@ -60,8 +62,14 @@ class _BikeListScreenState extends State<BikeListScreen> {
         title: const Text('Confirm Deletion'),
         content: const Text('Are you sure you want to delete this bike?'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Delete')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
         ],
       ),
     );
@@ -74,11 +82,19 @@ class _BikeListScreenState extends State<BikeListScreen> {
         await AdminApiService.deleteBike(bikeId);
         _fetchBikes(); // Refresh the list after deletion
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bike deleted successfully!')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Bike deleted successfully!')),
+          );
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete bike: ${e.toString().replaceFirst('Exception: ', '')}')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Failed to delete bike: ${e.toString().replaceFirst('Exception: ', '')}',
+              ),
+            ),
+          );
         }
         print('Error deleting bike: $e');
       } finally {
@@ -99,7 +115,8 @@ class _BikeListScreenState extends State<BikeListScreen> {
     await showDialog(
       context: context,
       builder: (context) {
-        return StatefulBuilder( // Use StatefulBuilder to update dialog UI
+        return StatefulBuilder(
+          // Use StatefulBuilder to update dialog UI
           builder: (context, setState) {
             return AlertDialog(
               title: const Text('Add New Bike'),
@@ -139,7 +156,9 @@ class _BikeListScreenState extends State<BikeListScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    setState(() { dialogError = null; }); // Clear dialog error
+                    setState(() {
+                      dialogError = null;
+                    }); // Clear dialog error
                     final code = codeController.text.trim();
                     final lat = double.tryParse(latController.text.trim());
                     final lng = double.tryParse(lngController.text.trim());
@@ -160,12 +179,17 @@ class _BikeListScreenState extends State<BikeListScreen> {
                       });
                       _fetchBikes(); // Refresh list
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bike added successfully!')));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Bike added successfully!'),
+                          ),
+                        );
                       }
                       Navigator.pop(context); // Close dialog
                     } catch (e) {
                       setState(() {
-                        dialogError = 'Failed to add bike: ${e.toString().replaceFirst('Exception: ', '')}';
+                        dialogError =
+                            'Failed to add bike: ${e.toString().replaceFirst('Exception: ', '')}';
                       });
                       print('Error adding bike: $e');
                     }
@@ -180,48 +204,68 @@ class _BikeListScreenState extends State<BikeListScreen> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     // Removed AppBar as it's handled by AdminHomeScreen
-    return RefreshIndicator( // Added RefreshIndicator for pull-to-refresh
+    return RefreshIndicator(
       onRefresh: _fetchBikes,
-      child: Stack( // Use Stack to position the FloatingActionButton
+      child: Stack(
         children: [
+          // Main Content
           _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _error != null
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(_error!, textAlign: TextAlign.center),
-                          const SizedBox(height: 10),
-                          ElevatedButton(
-                            onPressed: _fetchBikes,
-                            child: const Text('Retry'),
-                          ),
-                        ],
-                      ),
-                    )
-                  : _bikes.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'No bikes found. Click + to add one.',
-                            style: TextStyle(fontSize: 16, color: Colors.grey),
-                            textAlign: TextAlign.center,
-                          ),
-                        )
-                      : ListView.builder(
-                          itemCount: _bikes.length,
-                          itemBuilder: (context, index) {
-                            final bike = _bikes[index];
-                            return BikeCard(
-                              bike: bike,
-                              onDelete: () => _deleteBike(bike.id), // Pass delete callback
-                            );
-                          },
+              ? ListView(
+                  // <-- Make error state scrollable
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    SizedBox(
+                      height: MediaQuery.of(context).size.height * 0.6,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(_error!, textAlign: TextAlign.center),
+                            const SizedBox(height: 10),
+                            ElevatedButton(
+                              onPressed: _fetchBikes,
+                              child: const Text('Retry'),
+                            ),
+                          ],
                         ),
+                      ),
+                    ),
+                  ],
+                )
+              : _bikes.isEmpty
+              ? ListView(
+                  // <-- Make empty state scrollable
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: const [
+                    SizedBox(
+                      height: 320,
+                      child: Center(
+                        child: Text(
+                          'No bikes found. Click + to add one.',
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : ListView.builder(
+                  itemCount: _bikes.length,
+                  itemBuilder: (context, index) {
+                    
+                    final bike = _bikes[index];
+                    return BikeCard(
+                      bike: bike,
+                      onDelete: () =>
+                          _deleteBike(bike.id), // Pass delete callback
+                    );
+                  },
+                ),
           // Floating Action Button for adding bikes
           Positioned(
             bottom: 16,

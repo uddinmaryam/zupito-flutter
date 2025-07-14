@@ -25,10 +25,11 @@ class Station {
       latitude: (json['latitude'] as num?)?.toDouble() ?? 0.0,
       longitude: (json['longitude'] as num?)?.toDouble() ?? 0.0,
       capacity: json['capacity'] as int? ?? 0,
-      // FIX: Map each item in the 'bikes' list to a Bike.fromJson
+      // Defensive: only parse Map<String, dynamic> entries as bikes!
       bikes:
           (json['bikes'] as List<dynamic>?)
-              ?.map((e) => Bike.fromJson(e as Map<String, dynamic>))
+              ?.where((e) => e is Map<String, dynamic>)
+              .map((e) => Bike.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
     );

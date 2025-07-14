@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:zupito/screens/map/map_screen.dart';
+import 'package:zupito/screens/signup_screen.dart';
 import '../services/auth_service.dart';
 import '../services/secure_storage_services.dart';
-import 'signup_screen.dart';
 import '../services/otp_socket_service.dart';
-import 'package:zupito/api/api_config.dart'; // Import api_config to check backendUrl
+import 'package:zupito/api/api_config.dart';
+import 'package:zupito/services/api_service.dart'; // Import ApiService
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -23,6 +24,8 @@ class _LoginScreenState extends State<LoginScreen>
   final TextEditingController _passwordController = TextEditingController();
   final AuthService authService = AuthService();
   final SecureStorageService _secureStorage = SecureStorageService();
+  final ApiService _apiService =
+      ApiService(); // Create an instance of ApiService
 
   @override
   void initState() {
@@ -59,7 +62,6 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-    // DEBUG: Print the backend URL being used
     print(
       "DEBUG: Attempting login to backend URL: ${AuthService.baseUrl}/login",
     );
@@ -71,8 +73,13 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (result != null && result['token'] != null && result['user'] != null) {
         print("DEBUG: Login successful. Saving token and user profile.");
-        await _secureStorage.writeUserAuthToken(result['token']);
+        final String token = result['token'];
+        await _secureStorage.writeUserAuthToken(token);
         await _secureStorage.writeUserProfile(jsonEncode(result['user']));
+
+        // FIX: Set the auth token in the ApiService instance
+        _apiService.setAuthToken(token);
+        print("DEBUG: ApiService auth token set.");
 
         final userId = result['user']['_id'] ?? result['user']['id'];
         if (userId != null) {

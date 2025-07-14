@@ -3,9 +3,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
-import 'package:zupito/models/bike.dart'; // Ensure this import is correct
-import 'package:zupito/models/station.dart'; // Ensure this import is correct
-import 'package:zupito/models/user.dart'; // Ensure this import is correct
+import 'package:zupito/models/bike.dart';
+import 'package:zupito/models/station.dart';
+import 'package:zupito/models/user.dart';
+import 'package:flutter/foundation.dart';
 
 class ApiService {
   static const String _baseUrl =
@@ -17,7 +18,7 @@ class ApiService {
     _authToken = token;
   }
 
-  Map<String, String> _getHeaders() {
+  Map<String, String> getHeaders() {
     return {
       'Content-Type': 'application/json',
       if (_authToken != null) 'Authorization': 'Bearer $_authToken',
@@ -26,34 +27,73 @@ class ApiService {
 
   Future<List<Station>> getStations() async {
     final url = Uri.parse('$_baseUrl/stations');
-
     try {
-      final response = await http.get(url, headers: _getHeaders());
+      final response = await http.get(url, headers: getHeaders());
+
+      debugPrint(
+        '--- Raw JSON Response for getStations (${response.statusCode}) ---',
+      );
+      debugPrint(response.body);
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonMap = json.decode(response.body);
-        final List<dynamic> jsonList = jsonMap['stations'];
+        final dynamic decodedBody = json.decode(response.body);
 
-        print('--- Raw JSON Response for all Stations from getStations ---');
-        print(jsonEncode(jsonMap));
-        print('----------------------------------------------------');
+        // Case 1: Top-level list
+        if (decodedBody is List) {
+          return decodedBody
+              .where((jsonItem) => jsonItem is Map<String, dynamic>)
+              .map(
+                (jsonItem) =>
+                    Station.fromJson(jsonItem as Map<String, dynamic>),
+              )
+              .toList();
+        }
 
-        return jsonList.map((jsonItem) {
-          if (jsonItem['name'] == 'Dhobighat') {
-            print('--- Raw JSON for Dhobighat Station (before parsing) ---');
-            print(jsonEncode(jsonItem));
-            print('----------------------------------------------------');
-            print('Dhobighat bikes array in raw JSON: ${jsonItem['bikes']}');
+        // Case 2: Object with 'stations' or 'data' key
+        if (decodedBody is Map<String, dynamic>) {
+          if (decodedBody.containsKey('stations')) {
+            final stationsList = decodedBody['stations'];
+            if (stationsList is List) {
+              return stationsList
+                  .where((jsonItem) => jsonItem is Map<String, dynamic>)
+                  .map(
+                    (jsonItem) =>
+                        Station.fromJson(jsonItem as Map<String, dynamic>),
+                  )
+                  .toList();
+            }
           }
-          return Station.fromJson(jsonItem as Map<String, dynamic>);
-        }).toList();
+          if (decodedBody.containsKey('data')) {
+            final dataList = decodedBody['data'];
+            if (dataList is List) {
+              return dataList
+                  .where((jsonItem) => jsonItem is Map<String, dynamic>)
+                  .map(
+                    (jsonItem) =>
+                        Station.fromJson(jsonItem as Map<String, dynamic>),
+                  )
+                  .toList();
+            }
+          }
+        }
+
+        throw Exception('Unexpected response format for stations API.');
       } else {
-        final errorBody = json.decode(response.body);
-        throw Exception(
-          'Failed to load stations: ${errorBody['message'] ?? 'Unknown error'} (Status: ${response.statusCode})',
-        );
+        String errorMessage = 'Unknown error';
+        try {
+          final errorBody = json.decode(response.body);
+          errorMessage =
+              errorBody['message'] ??
+              errorBody['error'] ??
+              'Server responded with status ${response.statusCode}';
+        } catch (e) {
+          errorMessage =
+              'Failed to parse error response: ${response.body} (Status: ${response.statusCode})';
+        }
+        throw Exception('Failed to load stations: $errorMessage');
       }
     } catch (e) {
+      debugPrint('Error calling getStations API: $e');
       throw Exception('Error calling getStations API: $e');
     }
   }
@@ -72,7 +112,7 @@ class ApiService {
     try {
       final response = await http.post(
         url,
-        headers: _getHeaders(),
+        headers: getHeaders(),
         body: json.encode({
           'userId': userId,
           'bikeId': bikeId,
@@ -83,8 +123,8 @@ class ApiService {
           'startLocation': {'latitude': startLat, 'longitude': startLng},
         }),
       );
-      print('Start Ride API Response Status: ${response.statusCode}');
-      print('Start Ride API Response Body: ${response.body}');
+      debugPrint('Start Ride API Response Status: ${response.statusCode}');
+      debugPrint('Start Ride API Response Body: ${response.body}');
 
       if (response.statusCode == 201) {
         return json.decode(response.body);
@@ -107,7 +147,7 @@ class ApiService {
 
     final response = await http.post(
       url,
-      headers: _getHeaders(),
+      headers: getHeaders(),
       body: jsonEncode({
         'rideId': rideId,
         'userLocation': {
@@ -130,9 +170,9 @@ class ApiService {
   Future getActiveRide() async {
     final url = Uri.parse('$_baseUrl/rides/active');
     try {
-      final response = await http.get(url, headers: _getHeaders());
-      print('Get Active Ride API Response Status: ${response.statusCode}');
-      print('Get Active Ride API Response Body: ${response.body}');
+      final response = await http.get(url, headers: getHeaders());
+      debugPrint('Get Active Ride API Response Status: ${response.statusCode}');
+      debugPrint('Get Active Ride API Response Body: ${response.body}');
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseBody = json.decode(response.body);
         if (responseBody['activeRide'] == true) {
@@ -148,7 +188,7 @@ class ApiService {
         );
       }
     } catch (e) {
-      print('Error checking for active ride: $e');
+      debugPrint('Error checking for active ride: $e');
       return null;
     }
   }
@@ -156,7 +196,7 @@ class ApiService {
   Future<Map<String, dynamic>> fetchRideSummary(String userId) async {
     final response = await http.get(
       Uri.parse('$_baseUrl/rides/user/$userId/summary'),
-      headers: _getHeaders(),
+      headers: getHeaders(),
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
@@ -177,19 +217,19 @@ class ApiService {
 
   Future<List<Map<String, dynamic>>> fetchRideHistory(String userId) async {
     final url = Uri.parse('$_baseUrl/rides/user/$userId/history');
-    print('Attempting to fetch ride history from URL: $url');
+    debugPrint('Attempting to fetch ride history from URL: $url');
     try {
-      final response = await http.get(url, headers: _getHeaders());
+      final response = await http.get(url, headers: getHeaders());
 
-      print('Ride History API Response Status: ${response.statusCode}');
-      print('Ride History API Response Body: ${response.body}');
+      debugPrint('Ride History API Response Status: ${response.statusCode}');
+      debugPrint('Ride History API Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data is List) {
           return List<Map<String, dynamic>>.from(data);
         } else {
-          print(
+          debugPrint(
             'Ride History API: Expected a List, but received: ${data.runtimeType}',
           );
           throw Exception(
@@ -210,57 +250,65 @@ class ApiService {
         );
       }
     } catch (e) {
-      print('Error in fetchRideHistory API call: $e');
+      debugPrint('Error in fetchRideHistory API call: $e');
       throw Exception('Error calling fetchRideHistory API: $e');
     }
   }
-
-  // REMOVED: The login method that took phone and OTP.
-  // This responsibility is now solely with AuthService.
-  /*
-  Future<Map<String, dynamic>> login({
-    required String phone,
-    required String otp,
-  }) async {
-    final url = Uri.parse('$_baseUrl/auth/login');
-
-    try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'phone': phone, 'otp': otp}),
-      );
-
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        throw Exception(
-          'Login failed: ${jsonDecode(response.body)['message'] ?? 'Unknown error'}',
-        );
-      }
-    } catch (e) {
-      throw Exception('Error during login: $e');
-    }
-  }
-  */
 
   Future<List<Bike>> getBikes() async {
     final url = Uri.parse('$_baseUrl/bikes');
 
     try {
-      final response = await http.get(url, headers: _getHeaders());
+      final response = await http.get(url, headers: getHeaders());
+
+      debugPrint(
+        '--- Raw JSON Response for getBikes (${response.statusCode}) ---',
+      );
+      debugPrint(response.body);
+      debugPrint('----------------------------------------------------');
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonMap = json.decode(response.body);
-        final List<dynamic> jsonList = jsonMap['bikes'];
+        final dynamic decodedBody = json.decode(response.body);
 
-        print('--- Raw JSON Response for all Bikes from getBikes ---');
-        print(jsonEncode(jsonMap));
-        print('----------------------------------------------------');
-
-        return jsonList
-            .map((jsonItem) => Bike.fromJson(jsonItem as Map<String, dynamic>))
-            .toList();
+        if (decodedBody is List) {
+          debugPrint(
+            'DEBUG: getBikes received top-level List. Mapping directly.',
+          );
+          return decodedBody.map((jsonItem) {
+            debugPrint(
+              'DEBUG: Processing jsonItem type: ${jsonItem.runtimeType}',
+            );
+            if (jsonItem is Map<String, dynamic>) {
+              return Bike.fromJson(jsonItem);
+            } else {
+              throw Exception(
+                'Expected Map<String, dynamic> but got ${jsonItem.runtimeType} in bikes list.',
+              );
+            }
+          }).toList();
+        } else if (decodedBody is Map<String, dynamic> &&
+            decodedBody.containsKey('bikes')) {
+          final List<dynamic> jsonList = decodedBody['bikes'];
+          debugPrint(
+            'DEBUG: getBikes received Map with "bikes" key. Mapping "bikes" list.',
+          );
+          return jsonList.map((jsonItem) {
+            debugPrint(
+              'DEBUG: Processing jsonItem type: ${jsonItem.runtimeType}',
+            );
+            if (jsonItem is Map<String, dynamic>) {
+              return Bike.fromJson(jsonItem);
+            } else {
+              throw Exception(
+                'Expected Map<String, dynamic> but got ${jsonItem.runtimeType} in "bikes" list.',
+              );
+            }
+          }).toList();
+        } else {
+          throw Exception(
+            'Unexpected response format for bikes API. Expected a List or a Map with a "bikes" key.',
+          );
+        }
       } else {
         final errorBody = json.decode(response.body);
         throw Exception(
@@ -268,6 +316,7 @@ class ApiService {
         );
       }
     } catch (e) {
+      debugPrint('Error calling getBikes API: $e');
       throw Exception('Error calling getBikes API: $e');
     }
   }

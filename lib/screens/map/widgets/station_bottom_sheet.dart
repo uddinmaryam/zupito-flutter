@@ -13,14 +13,14 @@ import 'package:zupito/models/station.dart';
 import 'package:zupito/models/user.dart';
 import 'package:zupito/services/secure_storage_services.dart';
 import 'package:zupito/utils/constants.dart';
-import 'package:zupito/screens/login_screen.dart'; // Added for explicit navigation
+import 'package:zupito/screens/login_screen.dart';
 
-// This is the top-level function that MapScreen calls.
-// It creates a DraggableScrollableSheet and wraps the content in _StationBottomSheetContent.
+// TOP-LEVEL FUNCTION (called by MapScreen)
 Widget buildStationBottomSheet(
   BuildContext context,
   Station station,
-  User userProfile, {
+  User userProfile,
+  ApiService apiService, {
   required Future<void> Function(
     String bikeCode,
     String rideId,
@@ -39,11 +39,12 @@ Widget buildStationBottomSheet(
       userProfile: userProfile,
       onRideStartConfirmed: onRideStartConfirmed,
       scrollController: scrollController,
+      apiService: apiService,
     ),
   );
 }
 
-// This is the StatefulWidget that manages the content and state of the bottom sheet.
+// Sheet Content Widget
 class _StationBottomSheetContent extends StatefulWidget {
   final Station station;
   final User userProfile;
@@ -55,12 +56,14 @@ class _StationBottomSheetContent extends StatefulWidget {
   )
   onRideStartConfirmed;
   final ScrollController scrollController;
+  final ApiService apiService;
 
   const _StationBottomSheetContent({
     required this.station,
     required this.userProfile,
     required this.onRideStartConfirmed,
     required this.scrollController,
+    required this.apiService,
   });
 
   @override
@@ -73,7 +76,6 @@ class _StationBottomSheetContentState
   List<Bike> _fullBikesInStation = [];
   bool _bikesLoading = true;
   String? _bikesError;
-  final ApiService _apiService = ApiService();
 
   @override
   void initState() {
@@ -81,28 +83,15 @@ class _StationBottomSheetContentState
     _fetchFullBikesForStation();
   }
 
-  // Ensure mounted check before setState
   Future<void> _fetchFullBikesForStation() async {
-    if (!mounted) return; // Crucial mounted check
+    if (!mounted) return;
     setState(() {
       _bikesLoading = true;
       _bikesError = null;
     });
     try {
-      // This assumes your backend's /stations endpoint now returns full Bike objects
-      // nested within the station JSON (as per our Option 1 discussion).
-      // If not, you'd need a separate API call per bike ID, or a bulk fetch.
-      // For now, we are relying on the Station model having List<Bike> bikes.
-      // The bikes property of the station object should already contain the full Bike objects
-      // if the backend is populating them and the Station.fromJson is updated.
-      _fullBikesInStation =
-          widget.station.bikes; // Directly use bikes from the station object
-
-      // If you still need to fetch bikes separately (e.g., if station.bikes only contains IDs):
-      // final List<Bike> allFetchedBikes = await _apiService.getBikes();
-      // _fullBikesInStation = allFetchedBikes
-      //     .where((bike) => widget.station.bikes.contains(bike.id)) // This assumes widget.station.bikes is List<String>
-      //     .toList();
+      // Assumes backend sends full Bike objects in station.bikes
+      _fullBikesInStation = widget.station.bikes;
     } catch (e) {
       _bikesError =
           'Failed to load bike details: ${e.toString().replaceFirst('Exception: ', '')}';
@@ -112,7 +101,6 @@ class _StationBottomSheetContentState
       }
     } finally {
       if (mounted) {
-        // Crucial mounted check
         setState(() {
           _bikesLoading = false;
         });
@@ -207,6 +195,7 @@ class _StationBottomSheetContentState
                                   ),
                                   startStationId: widget.station.id,
                                   station: widget.station,
+                                  apiService: widget.apiService,
                                 ),
                               )
                               .toList(),
@@ -240,6 +229,7 @@ class _StationBottomSheetContentState
                                   ),
                                   startStationId: widget.station.id,
                                   station: widget.station,
+                                  apiService: widget.apiService,
                                 ),
                               )
                               .toList(),
@@ -275,6 +265,7 @@ class _BikeCard extends StatefulWidget {
   final LatLng stationStartLocation;
   final String startStationId;
   final Station station;
+  final ApiService apiService;
 
   const _BikeCard({
     super.key,
@@ -285,6 +276,7 @@ class _BikeCard extends StatefulWidget {
     required this.stationStartLocation,
     required this.startStationId,
     required this.station,
+    required this.apiService,
   });
 
   @override
@@ -293,13 +285,10 @@ class _BikeCard extends StatefulWidget {
 
 class _BikeCardState extends State<_BikeCard> {
   bool _loading = false;
-  final ApiService _apiService = ApiService();
   static const double _pricePerMinute = 2.0;
 
   List<Station> _selectableStations = [];
   Station? _selectedDestinationStation;
-
-  Map<String, String> get _jsonHeaders => {'Content-Type': 'application/json'};
 
   @override
   void initState() {
@@ -309,8 +298,8 @@ class _BikeCardState extends State<_BikeCard> {
 
   Future<void> _fetchStations() async {
     try {
-      final allStations = await _apiService.getStations();
-      if (!mounted) return; // Mounted check
+      final allStations = await widget.apiService.getStations();
+      if (!mounted) return;
 
       final List<Station> otherStations = allStations
           .where((s) => s.id != widget.startStationId)
@@ -320,23 +309,21 @@ class _BikeCardState extends State<_BikeCard> {
 
       setState(() {
         _selectableStations = allSelectable;
-        _selectedDestinationStation =
-            widget.station; // Default to current station
+        _selectedDestinationStation = widget.station;
       });
 
       if (_selectableStations.isEmpty && widget.station.id.isNotEmpty) {
-        if (!mounted) return; // Mounted check
+        if (!mounted) return;
         setState(() {
           _selectableStations.add(widget.station);
           _selectedDestinationStation = widget.station;
         });
       } else if (_selectableStations.isEmpty) {
-        if (!mounted) return; // Mounted check
+        if (!mounted) return;
         showTopNotification(context, "No stations available for selection.");
       }
     } catch (e) {
       if (mounted) {
-        // Mounted check
         showTopNotification(
           context,
           "❌ Error fetching stations: ${e.toString()}",
@@ -356,7 +343,7 @@ class _BikeCardState extends State<_BikeCard> {
     if (_selectableStations.isEmpty || _selectedDestinationStation == null) {
       await _fetchStations();
       if (_selectableStations.isEmpty) {
-        if (!mounted) return; // Mounted check
+        if (!mounted) return;
         showTopNotification(
           context,
           "No destination stations available for selection.",
@@ -368,15 +355,13 @@ class _BikeCardState extends State<_BikeCard> {
       }
     }
 
-    if (!mounted) return; // Mounted check
+    if (!mounted) return;
     await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setState) {
-            // final selectedStationName = widget.station.name; // Not used, can remove
-
             List<DropdownMenuItem<Station>> destinationDropdownItems = [];
 
             destinationDropdownItems.add(
@@ -461,7 +446,7 @@ class _BikeCardState extends State<_BikeCard> {
                   onPressed: () async {
                     Navigator.of(ctx).pop();
                     await _startRide(
-                      widget.bike,
+                      bike,
                       selectedDuration,
                       _selectedDestinationStation?.id ?? widget.station.id,
                     );
@@ -485,11 +470,10 @@ class _BikeCardState extends State<_BikeCard> {
     int duration,
     String destinationStationId,
   ) async {
-    if (!mounted) return; // Mounted check
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
-      final userJson = await SecureStorageService()
-          .readUserProfile(); // FIX: Use readUserProfile
+      final userJson = await SecureStorageService().readUserProfile();
       final decoded = userJson != null ? jsonDecode(userJson) : null;
       final String? userId = decoded != null && decoded['_id'] != null
           ? decoded['_id'].toString()
@@ -497,7 +481,6 @@ class _BikeCardState extends State<_BikeCard> {
 
       if (userId == null) {
         if (mounted) {
-          // Mounted check
           showTopNotification(
             context,
             "❌ User ID not found in storage. Please log in again.",
@@ -507,23 +490,23 @@ class _BikeCardState extends State<_BikeCard> {
             MaterialPageRoute(builder: (context) => const LoginScreen()),
           );
         }
-        return; // Exit if userId is null
+        return;
       }
 
       final double initialEstimatedCost = duration * _pricePerMinute;
-
       final LatLng confirmedBikeStartLocation = widget.stationStartLocation;
 
-      final Map<String, dynamic> responseData = await _apiService.startRide(
-        userId: userId,
-        bikeId: bike.id,
-        selectedDuration: duration,
-        startStationId: widget.startStationId,
-        destinationStationId: destinationStationId,
-        estimatedCost: initialEstimatedCost,
-        startLat: confirmedBikeStartLocation.latitude,
-        startLng: confirmedBikeStartLocation.longitude,
-      );
+      final Map<String, dynamic> responseData = await widget.apiService
+          .startRide(
+            userId: userId,
+            bikeId: bike.id,
+            selectedDuration: duration,
+            startStationId: widget.startStationId,
+            destinationStationId: destinationStationId,
+            estimatedCost: initialEstimatedCost,
+            startLat: confirmedBikeStartLocation.latitude,
+            startLng: confirmedBikeStartLocation.longitude,
+          );
 
       final String rideId = responseData['rideId'] ?? '';
       final String bikeCode = bike.code ?? 'Unknown';
@@ -542,13 +525,11 @@ class _BikeCardState extends State<_BikeCard> {
       }
 
       if (mounted) {
-        // Mounted check
         showTopNotification(context, "✅ Payment Successful! Ride started.");
-        Navigator.pop(context); // Close the bottom sheet
+        Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        // Mounted check
         showTopNotification(context, "❌ Error starting ride: ${e.toString()}");
       }
     } finally {
@@ -557,11 +538,10 @@ class _BikeCardState extends State<_BikeCard> {
   }
 
   Future<void> _handleUnlock() async {
-    if (!mounted) return; // Mounted check
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
-      final userJson = await SecureStorageService()
-          .readUserProfile(); // FIX: Use readUserProfile
+      final userJson = await SecureStorageService().readUserProfile();
       final decoded = userJson != null ? jsonDecode(userJson) : null;
       final String? userId = decoded != null && decoded['_id'] != null
           ? decoded['_id'].toString()
@@ -569,7 +549,6 @@ class _BikeCardState extends State<_BikeCard> {
 
       if (userId == null) {
         if (mounted) {
-          // Mounted check
           showTopNotification(
             context,
             "❌ User ID not found in secure storage. Please log in again.",
@@ -579,25 +558,29 @@ class _BikeCardState extends State<_BikeCard> {
             MaterialPageRoute(builder: (context) => const LoginScreen()),
           );
         }
-        return; // Exit if userId is null
+        return;
       }
 
       final response = await http.post(
         Uri.parse('${Constants.apiUrl}/bikes/generate-otp'),
-        headers: _jsonHeaders,
-        body: jsonEncode({'bikeCode': widget.bike.code, 'userId': userId}),
+        headers: widget.apiService.getHeaders(),
+        body: jsonEncode({
+          'bikeCode': widget.bike.code ?? '',
+          'userId': userId,
+        }),
       );
 
       if (response.statusCode == 200) {
         final otp = jsonDecode(response.body)['otp'];
         if (mounted) {
-          // Mounted check
-          showTopNotification(context, "🔐 OTP for ${widget.bike.code}: $otp");
+          showTopNotification(
+            context,
+            "🔐 OTP for ${widget.bike.code ?? 'N/A'}: $otp",
+          );
         }
 
         String? enteredOtp;
         if (mounted) {
-          // Mounted check
           await showDialog(
             context: context,
             barrierDismissible: false,
@@ -617,29 +600,30 @@ class _BikeCardState extends State<_BikeCard> {
 
         final verify = await http.post(
           Uri.parse('${Constants.apiUrl}/bikes/verify-otp'),
-          headers: _jsonHeaders,
-          body: jsonEncode({'code': widget.bike.code, 'otp': enteredOtp}),
+          headers: widget.apiService.getHeaders(),
+          body: jsonEncode({
+            'code': widget.bike.code ?? '',
+            'otp': enteredOtp ?? '',
+          }),
         );
 
         if (verify.statusCode == 200) {
           await _showPaymentDialog(widget.bike);
         } else {
           final err = jsonDecode(verify.body);
-          if (mounted) {
-            // Mounted check
-            showTopNotification(context, "❌ ${err['message']}");
-          }
+          showTopNotification(
+            context,
+            "❌ ${err['message'] ?? 'OTP verification failed.'}",
+          );
         }
       } else {
         final err = jsonDecode(response.body);
         if (mounted) {
-          // Mounted check
           showTopNotification(context, "❌ ${err['message']}");
         }
       }
     } catch (e) {
       if (mounted) {
-        // Mounted check
         showTopNotification(context, "❌ Error unlocking bike: ${e.toString()}");
       }
     } finally {
@@ -701,7 +685,6 @@ class _OTPDialogState extends State<_OTPDialog> {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
-        // Mounted check
         timer.cancel();
         return;
       }
@@ -712,7 +695,6 @@ class _OTPDialogState extends State<_OTPDialog> {
           Navigator.pop(context);
         }
         if (mounted) {
-          // Mounted check
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("⏱️ Time expired. Please try again.")),
           );

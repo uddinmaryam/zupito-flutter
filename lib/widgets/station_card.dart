@@ -16,8 +16,7 @@ class StationCard extends StatelessWidget {
     // Access properties directly from the Station object
     final String locationText =
         'Lat: ${station.latitude.toStringAsFixed(4)}, Lng: ${station.longitude.toStringAsFixed(4)}';
-    final int bikeCount =
-        station.bikes.length; // Number of bike IDs in the array
+    // Removed bikeCount local variable as it's directly used in the Text widget
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -31,22 +30,24 @@ class StationCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.location_city, color: Colors.blueAccent),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        station.name, // Display station name
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blueGrey,
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.location_city, color: Colors.blueAccent),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          station.name, // Display station name
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blueGrey,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 // Delete button
                 if (onDelete != null)
@@ -63,6 +64,7 @@ class StationCard extends StatelessWidget {
                 const Icon(Icons.map, size: 18, color: Colors.grey),
                 const SizedBox(width: 8),
                 Expanded(
+                  // Ensures location text doesn't overflow
                   child: Text(
                     'Location: $locationText', // Display formatted location
                     style: const TextStyle(fontSize: 14, color: Colors.black87),
@@ -76,9 +78,13 @@ class StationCard extends StatelessWidget {
               children: [
                 const Icon(Icons.storage, size: 18, color: Colors.grey),
                 const SizedBox(width: 8),
-                Text(
-                  'Capacity: ${station.capacity}', // Display capacity
-                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                // Capacity text can be long, so wrap it with Expanded
+                Expanded(
+                  child: Text(
+                    'Capacity: ${station.capacity}', // Display capacity
+                    style: const TextStyle(fontSize: 14, color: Colors.black87),
+                    overflow: TextOverflow.ellipsis, // Add overflow
+                  ),
                 ),
               ],
             ),
@@ -87,9 +93,14 @@ class StationCard extends StatelessWidget {
               children: [
                 const Icon(Icons.pedal_bike, size: 18, color: Colors.grey),
                 const SizedBox(width: 8),
-                Text(
-                  'Bikes Parked: $bikeCount', // Display number of bikes
-                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                Expanded(
+                  // <--- FIX: Wrap the Text with Expanded here
+                  child: Text(
+                    'Bikes Parked: ${station.availableBikes} / ${station.capacity} (Available / Total)', // Display number of bikes
+                    style: const TextStyle(fontSize: 14, color: Colors.black87),
+                    overflow:
+                        TextOverflow.ellipsis, // Add ellipsis for long text
+                  ),
                 ),
               ],
             ),

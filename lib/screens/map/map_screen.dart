@@ -4,21 +4,24 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:geolocator/geolocator.dart'
+    as geo; // Using alias to avoid conflict with Location package
 import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:zupito/models/station.dart';
 import 'package:zupito/models/user.dart';
 import 'package:zupito/providers/theme_provider.dart';
+import 'package:zupito/screens/map/esewa_payment_screen.dart';
 import 'package:zupito/services/api_service.dart';
 import 'package:zupito/services/otp_socket_service.dart';
 import 'package:zupito/services/secure_storage_services.dart';
-import 'package:zupito/services/station_service.dart';
+// import 'package:zupito/services/station_service.dart'; // This import seems unused, can be removed
 import 'package:zupito/utils/constants.dart';
-import 'widgets/station_bottom_sheet.dart' hide ApiService; // Ensure this import path is correct and the file exists
+import 'widgets/station_bottom_sheet.dart';
 import 'package:zupito/screens/login_screen.dart';
 
 class MapScreen extends StatefulWidget {
@@ -82,14 +85,44 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     _rippleAnimation = Tween<double>(begin: 0, end: 80).animate(
       CurvedAnimation(parent: _rippleController, curve: Curves.easeOut),
     );
-    _initialize(); // Call initialize after animation controller setup
+    _initialize();
   }
 
   void _initialize() async {
-    if (!mounted) return;
+    if (!mounted) {
+      debugPrint("DEBUG: _initialize called but widget not mounted.");
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
+
+    final token = await _secureStorage.readUserAuthToken();
+    if (token != null) {
+      _apiService.setAuthToken(token);
+      debugPrint("DEBUG: MapScreen initialized ApiService with token.");
+    } else {
+      debugPrint(
+        "DEBUG: MapScreen: No user auth token found, redirecting to login.",
+      );
+      if (mounted) {
+        // Use WidgetsBinding.instance.addPostFrameCallback to ensure navigation
+        // happens after the build cycle completes, preventing setState during build errors.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            // Re-check mounted after post frame callback
+            Navigator.pushReplacementNamed(context, '/login');
+          }
+        });
+      }
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      return;
+    }
 
     bool userLoadedSuccessfully = false;
     try {
@@ -98,8 +131,17 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         userLoadedSuccessfully = true;
       }
     } catch (e) {
-      print("User profile loading error in _initialize: $e");
+      debugPrint("ERROR: User profile loading error in _initialize: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Failed to load user profile: ${e.toString()}"),
+          ),
+        );
+      }
     }
+
+    if (!mounted) return; // Check mounted after async operation
 
     if (userLoadedSuccessfully) {
       try {
@@ -112,9 +154,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             const Duration(seconds: 5),
             (_) => _loadStations(),
           );
+          debugPrint("DEBUG: Station refresh timer started.");
         }
-      } catch (e) {
-        print("Map features initialization error in _initialize: $e");
+      } on Exception catch (e) {
+        debugPrint(
+          "ERROR: Map features initialization error in _initialize: $e",
+        );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -122,12 +167,23 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             ),
           );
         }
+      } catch (e) {
+        debugPrint(
+          "ERROR: Unexpected error during map features initialization: $e",
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("An unexpected error occurred: ${e.toString()}"),
+            ),
+          );
+        }
       }
     } else {
+      debugPrint("DEBUG: User profile not loaded, ensuring redirect to login.");
       if (mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          // Only navigate if we are still on MapScreen and userProfile is null
-          // This prevents infinite loops if login screen tries to navigate back here
+          // Check current route to prevent redundant pushes if already on login
           if (ModalRoute.of(context)?.settings.name != '/login') {
             Navigator.pushReplacementNamed(context, '/login');
           }
@@ -139,14 +195,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       setState(() {
         _isLoading = false;
       });
+      debugPrint("DEBUG: _isLoading set to false.");
     }
   }
 
   Future<void> _checkActiveRide() async {
     try {
       final activeRideData = await _apiService.getActiveRide();
+      if (!mounted) return; // Check mounted after API call
       if (activeRideData != null) {
-        if (!mounted) return;
         setState(() {
           _isRideActive = true;
           _activeBikeCode = activeRideData['bikeCode'];
@@ -161,19 +218,30 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         _startDummyBikeMovement();
         if (_activeBikeLocation != null && mounted) {
           _mapController.move(_activeBikeLocation!, 17.0);
+          debugPrint("DEBUG: Map centered on active bike location.");
         }
+        debugPrint("DEBUG: Active ride found: $_activeBikeCode");
       } else {
-        if (!mounted) return;
         setState(() {
           _isRideActive = false;
         });
+        debugPrint("DEBUG: No active ride found.");
       }
     } catch (e) {
-      print("Error checking active ride: $e");
+      debugPrint("ERROR: Error checking active ride: $e");
       if (mounted) {
         setState(() {
           _isRideActive = false;
         });
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "Failed to check active ride status: ${e.toString()}",
+            ),
+          ),
+        );
       }
     }
   }
@@ -188,6 +256,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           ),
         ),
       );
+      debugPrint(
+        "WARN: _moveToNearestStation called but _currentLocation is null.",
+      );
       return;
     }
     if (_userProfile == null) {
@@ -195,19 +266,25 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please log in to find nearest station.")),
       );
+      debugPrint(
+        "WARN: _moveToNearestStation called but _userProfile is null.",
+      );
       return;
     }
 
     try {
+      // Ensure headers are set from _apiService for authenticated requests
       final response = await http.post(
         Uri.parse('${Constants.apiUrl}/stations/nearest'),
-        headers: {'Content-Type': 'application/json'},
+        headers: _apiService.getHeaders(),
         body: jsonEncode({
           'lat': _currentLocation!.latitude,
           'lon': _currentLocation!.longitude,
-          'k': 2,
+          'k': 2, // Assuming 'k' is for number of nearest stations
         }),
       );
+
+      if (!mounted) return; // Check mounted after async operation
 
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
@@ -216,41 +293,65 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         if (nearestList.isNotEmpty) {
           final nearestId = nearestList.first['id'];
 
-          final fullStation = _stations.firstWhere(
+          // Find the full station object from our _stations list
+          final Station? fullStation = _stations.firstWhereOrNull(
             (s) => s.id == nearestId,
-            orElse: () {
-              final fallback = nearestList.first;
-              return Station(
-                id: fallback['id'],
-                name: fallback['name'],
-                latitude: fallback['latitude'],
-                longitude: fallback['longitude'],
-                capacity: fallback['capacity'] ?? 10,
-                bikes: [],
-              );
-            },
-          );
-          if (!mounted) return;
-          _mapController.move(
-            LatLng(fullStation.latitude, fullStation.longitude),
-            17.0,
           );
 
-          _onStationTap(fullStation);
+          if (fullStation != null) {
+            _mapController.move(
+              LatLng(fullStation.latitude, fullStation.longitude),
+              17.0,
+            );
+            debugPrint(
+              "DEBUG: Map moved to nearest station: ${fullStation.name}",
+            );
+            _onStationTap(fullStation);
+          } else {
+            // Fallback if the full station wasn't in our loaded _stations list
+            // This case should ideally not happen if _loadStations is reliable.
+            final fallbackStationData = nearestList.first;
+            final fallbackStation = Station(
+              id: fallbackStationData['id'],
+              name: fallbackStationData['name'] ?? 'Unknown Station',
+              latitude: fallbackStationData['latitude'],
+              longitude: fallbackStationData['longitude'],
+              capacity: fallbackStationData['capacity'] ?? 10,
+              bikes:
+                  [], // Bikes might not be included in the 'nearest' endpoint response
+            );
+            _mapController.move(
+              LatLng(fallbackStation.latitude, fallbackStation.longitude),
+              17.0,
+            );
+            debugPrint(
+              "DEBUG: Map moved to fallback nearest station: ${fallbackStation.name}",
+            );
+            // Consider if you want to show bottom sheet for fallback, as bike data might be missing
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text("Found nearest station: ${fallbackStation.name}"),
+              ),
+            );
+          }
         } else {
-          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text("❌ No nearby station found. Try again later."),
             ),
           );
+          debugPrint("INFO: Nearest stations list was empty.");
         }
       } else {
-        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("❌ Failed to find nearest station: ${response.body}"),
+            content: Text(
+              "❌ Failed to find nearest station: ${response.statusCode} - ${response.body}",
+            ),
           ),
+        );
+        debugPrint(
+          "ERROR: Failed to find nearest station, status: ${response.statusCode}, body: ${response.body}",
         );
       }
     } catch (e) {
@@ -260,81 +361,160 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           content: Text("❌ Error finding nearest station: ${e.toString()}"),
         ),
       );
+      debugPrint("ERROR: Exception in _moveToNearestStation: ${e.toString()}");
     }
   }
 
   Future<void> _loadUserProfile() async {
     final data = await _secureStorage.readUserProfile();
+    if (!mounted) return; // Check mounted after async operation
     if (data != null) {
-      final json = jsonDecode(data);
-      final user = User.fromJson(json);
-      if (!mounted) return;
-      setState(() => _userProfile = user);
-      // Ensure socket service is connected only if user profile is successfully loaded and widget is mounted
-      if (mounted) {
-        OtpSocketService().connect(user.id.toString(), context: context);
+      try {
+        final json = jsonDecode(data);
+        final user = User.fromJson(json);
+        setState(() => _userProfile = user);
+        debugPrint("DEBUG: User profile loaded: ${user.email}");
+        if (mounted) {
+          // Ensure context is available and socket service is connected
+          OtpSocketService().connect(user.id.toString(), context: context);
+          debugPrint("DEBUG: OTP Socket Service connected.");
+        }
+      } catch (e) {
+        debugPrint("ERROR: Failed to parse user profile from storage: $e");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Error loading user data. Please log in again."),
+            ),
+          );
+        }
+        await _secureStorage.deleteUserAuthToken(); // Clear invalid token
+        await _secureStorage.deleteUserProfile();
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/login');
+        }
       }
     } else {
-      print("User profile not found in secure storage.");
-      // _initialize will handle the navigation if _userProfile is null
+      debugPrint("INFO: User profile not found in secure storage.");
     }
   }
 
   Future<void> _initLocation() async {
     bool serviceEnabled = await _location.serviceEnabled();
     if (!serviceEnabled) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Location services are disabled. Requesting to enable...",
+          ),
+        ),
+      );
       serviceEnabled = await _location.requestService();
       if (!serviceEnabled) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Location services denied. Please enable them manually.",
+            ),
+          ),
+        );
         throw Exception("Location services are disabled.");
       }
     }
+    debugPrint("DEBUG: Location service enabled.");
 
     PermissionStatus permissionGranted = await _location.hasPermission();
     if (permissionGranted == PermissionStatus.denied) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Location permission denied. Requesting permission..."),
+        ),
+      );
       permissionGranted = await _location.requestPermission();
       if (permissionGranted != PermissionStatus.granted) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Location permission permanently denied. Please grant it in settings.",
+            ),
+          ),
+        );
         throw Exception("Location permission denied.");
       }
     }
+    debugPrint("DEBUG: Location permission granted.");
 
-    final loc = await _location.getLocation();
-    if (loc.latitude != null && loc.longitude != null) {
+    LocationData? loc;
+    try {
+      loc = await _location.getLocation();
+      debugPrint(
+        "DEBUG: Initial location fetched: ${loc?.latitude}, ${loc?.longitude}",
+      );
+    } catch (e) {
+      debugPrint("ERROR: Error getting initial location: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Failed to get initial location: ${e.toString()}"),
+          ),
+        );
+      }
+      throw Exception("Could not get initial location: ${e.toString()}");
+    }
+
+    if (loc != null && loc.latitude != null && loc.longitude != null) {
       final userLoc = LatLng(loc.latitude!, loc.longitude!);
       if (!mounted) return;
       setState(() {
         _currentLocation = userLoc;
       });
+      debugPrint("DEBUG: _currentLocation set to: $_currentLocation");
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _currentLocation != null) {
           _mapController.move(_currentLocation!, 15);
+          debugPrint("DEBUG: Map controller moved to initial location.");
         }
       });
     } else {
+      debugPrint("ERROR: Initial location data is null or incomplete.");
       throw Exception("Could not get initial location.");
     }
 
+    // Listen for location changes
     _location.onLocationChanged.listen((loc) {
+      if (!mounted) {
+        // Check mounted inside the stream listener
+        debugPrint(
+          "DEBUG: Location stream received data but widget not mounted.",
+        );
+        return;
+      }
       if (loc.latitude != null && loc.longitude != null) {
         final updatedLoc = LatLng(loc.latitude!, loc.longitude!);
-        if (!mounted) return;
         setState(() {
           _currentLocation = updatedLoc;
         });
+        // debugPrint("DEBUG: Location updated to: $updatedLoc"); // Too chatty, uncomment for specific debugging
       }
     });
   }
 
   Future<void> _loadStations() async {
     try {
-      final stations = await StationService.fetchStations();
-      debugPrint("🔥 Stations fetched: ${stations.length}");
-      if (!mounted) return;
+      final stations = await _apiService.getStations();
+      debugPrint("DEBUG: Stations fetched: ${stations.length}");
+      if (!mounted) return; // Check mounted after async operation
       setState(() {
         _stations.clear();
         _stations.addAll(stations);
       });
     } catch (e) {
+      debugPrint("ERROR: Error loading stations: ${e.toString()}");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Error loading stations: ${e.toString()}")),
@@ -351,6 +531,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           content: Text("User profile not available. Please log in again."),
         ),
       );
+      debugPrint(
+        "WARN: Station tapped but _userProfile is null. Redirecting to login.",
+      );
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -365,6 +548,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           content: Text("You have an active ride. Please end it first."),
         ),
       );
+      debugPrint("INFO: Station tapped but a ride is already active.");
       return;
     }
 
@@ -372,17 +556,18 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     setState(() {
       _selectedStation = station;
     });
+    debugPrint("DEBUG: Station tapped: ${station.name}");
 
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      // The call to buildStationBottomSheet is correct for a top-level function.
       builder: (context) => buildStationBottomSheet(
         context,
         station,
         _userProfile!,
+        _apiService,
         onRideStartConfirmed: (code, rideId, endTime, bikeStartLocation) async {
-          if (!mounted) return;
+          if (!mounted) return; // Check mounted before setState
           setState(() {
             _isRideActive = true;
             _activeBikeCode = code;
@@ -390,9 +575,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             _rideEndTime = endTime;
             _activeBikeLocation = bikeStartLocation;
           });
+          debugPrint(
+            "DEBUG: Ride started confirmed. Bike: $code, Ride ID: $rideId",
+          );
 
-          if (!mounted) return;
-          _mapController.move(bikeStartLocation, 17.0);
+          if (mounted) {
+            // Re-check mounted after setState
+            _mapController.move(bikeStartLocation, 17.0);
+            debugPrint("DEBUG: Map moved to bike start location.");
+          }
 
           _startRideCountdown();
           _startDummyBikeMovement();
@@ -400,32 +591,43 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       ),
     );
 
-    if (!mounted) return;
+    if (!mounted) return; // Check mounted after bottom sheet is dismissed
     setState(() {
       _selectedStation = null;
     });
-    _loadStations();
+    _loadStations(); // Refresh stations after potential ride start/end via bottom sheet
   }
 
   void _startRideCountdown() {
     _rideCountdownTimer?.cancel();
-    if (_rideEndTime == null) return;
+    if (_rideEndTime == null) {
+      debugPrint("WARN: _startRideCountdown called but _rideEndTime is null.");
+      return;
+    }
     if (!mounted) return;
     _remainingRideTime = _rideEndTime!.difference(DateTime.now());
     _rideCountdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
+        debugPrint("DEBUG: Ride countdown timer cancelled: widget unmounted.");
         return;
       }
       setState(() {
         if (_rideEndTime == null) {
+          // Double check inside setState
           timer.cancel();
+          debugPrint(
+            "DEBUG: Ride countdown timer cancelled: _rideEndTime became null.",
+          );
           return;
         }
         _remainingRideTime = _rideEndTime!.difference(DateTime.now());
         if (_remainingRideTime.isNegative) {
           timer.cancel();
-          _endRide(manualEnd: false);
+          debugPrint(
+            "DEBUG: Ride countdown timer finished. Ending ride (time's up).",
+          );
+          _endRide(manualEnd: false); // Automatically end ride if time runs out
         }
       });
     });
@@ -433,57 +635,80 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   void _startDummyBikeMovement() async {
     _dummyBikeMovementTimer?.cancel();
+    debugPrint("DEBUG: Dummy bike movement started.");
 
     if (_activeBikeLocation == null) {
-      print("Cannot start dummy bike movement: _activeBikeLocation is null.");
+      debugPrint(
+        "ERROR: Cannot start dummy bike movement: _activeBikeLocation is null.",
+      );
       return;
     }
-    final LatLng initialLocation = _activeBikeLocation!;
+    // final LatLng initialLocation = _activeBikeLocation!; // Not strictly needed as _activeBikeLocation is updated
 
     if (_stations.isEmpty) {
+      debugPrint(
+        "INFO: Stations list empty, attempting to load for dummy movement target.",
+      );
       try {
         await _loadStations();
       } catch (e) {
-        print("Error fetching stations for dummy movement target: $e");
+        debugPrint(
+          "ERROR: Error fetching stations for dummy movement target: $e",
+        );
       }
     }
 
+    if (!mounted) return; // Check mounted after async station load
+
     final List<Station> otherStations = _stations
-        .where((s) => s.id != _selectedStation?.id)
+        .where(
+          (s) => s.id != _selectedStation?.id,
+        ) // Exclude the station where ride started
         .toList();
 
     if (otherStations.isNotEmpty) {
       _dummyBikeTargetStation =
           otherStations[_random.nextInt(otherStations.length)];
-      print("Dummy bike target: ${_dummyBikeTargetStation?.name}");
+      debugPrint("DEBUG: Dummy bike target: ${_dummyBikeTargetStation?.name}");
     } else {
+      // Fallback: If only one station exists or no other stations, target the starting one
       _dummyBikeTargetStation = _selectedStation;
-      print(
-        "No other stations available, dummy bike target: ${_dummyBikeTargetStation?.name}",
+      debugPrint(
+        "WARN: No other stations available, dummy bike target: ${_dummyBikeTargetStation?.name ?? 'None'}",
       );
     }
 
-    _dummyBikeCurrentSpeed = 0.00005 + _random.nextDouble() * 0.00005;
-    _dummyBikeHeading = _random.nextDouble() * 2 * pi;
+    _dummyBikeCurrentSpeed =
+        0.00005 +
+        _random.nextDouble() * 0.00005; // Base speed + random variation
+    _dummyBikeHeading = _random.nextDouble() * 2 * pi; // Random initial heading
 
     final double maxSpeedChange = 0.000005;
     final double maxHeadingChange = 0.1;
-    final double targetApproachFactor = 0.05;
+    final double targetApproachFactor =
+        0.05; // How strongly the bike steers towards the target
 
     _dummyBikeMovementTimer = Timer.periodic(const Duration(seconds: 1), (
       timer,
     ) {
       if (!mounted) {
         timer.cancel();
+        debugPrint(
+          "DEBUG: Dummy bike movement timer cancelled: widget unmounted.",
+        );
         return;
       }
       if (!_isRideActive || _activeBikeLocation == null) {
         timer.cancel();
+        debugPrint(
+          "DEBUG: Dummy bike movement timer cancelled: ride not active or location null.",
+        );
         return;
       }
 
       final LatLng current = _activeBikeLocation!;
 
+      // Check if near target station
       if (_dummyBikeTargetStation != null) {
         final LatLng targetLatLng = LatLng(
           _dummyBikeTargetStation!.latitude,
@@ -492,22 +717,34 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         final Distance distance = const Distance();
 
         if (distance(current, targetLatLng) < 20) {
+          // Within 20 meters, consider "arrived"
           if (!mounted) return;
           setState(() {
-            _activeBikeLocation = targetLatLng;
-            _dummyBikeCurrentSpeed = 0.0;
-            _mapController.move(targetLatLng, _mapController.zoom);
+            _activeBikeLocation = targetLatLng; // Snap to target
+            _dummyBikeCurrentSpeed = 0.0; // Stop
+            _mapController.move(
+              targetLatLng,
+              _mapController.zoom,
+            ); // Center map on arrival
           });
-          print(
-            "Dummy bike arrived at target station: ${_dummyBikeTargetStation!.name}",
+          debugPrint(
+            "DEBUG: Dummy bike arrived at target station: ${_dummyBikeTargetStation!.name}",
           );
+          timer.cancel(); // Stop movement once arrived
           return;
         }
       }
 
-      _dummyBikeCurrentSpeed += (_random.nextDouble() * 2 - 1) * maxSpeedChange;
-      _dummyBikeCurrentSpeed = _dummyBikeCurrentSpeed.clamp(0.00002, 0.00015);
+      // Adjust speed
+      _dummyBikeCurrentSpeed +=
+          (_random.nextDouble() * 2 - 1) *
+          maxSpeedChange; // Slight random speed changes
+      _dummyBikeCurrentSpeed = _dummyBikeCurrentSpeed.clamp(
+        0.00002,
+        0.00015,
+      ); // Keep speed within reasonable bounds
 
+      // Adjust heading
       if (_dummyBikeTargetStation != null) {
         final LatLng targetLatLng = LatLng(
           _dummyBikeTargetStation!.latitude,
@@ -515,25 +752,34 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         );
         final Distance distance = const Distance();
 
+        // Calculate bearing to target and convert to radians
         double bearingToTarget = distance.bearing(current, targetLatLng);
         bearingToTarget = bearingToTarget * (pi / 180.0);
 
+        // Calculate angle difference, ensuring it's the shortest path around the circle
         double angleDiff = bearingToTarget - _dummyBikeHeading;
         if (angleDiff > pi) angleDiff -= 2 * pi;
         if (angleDiff < -pi) angleDiff += 2 * pi;
 
+        // Apply a factor to steer towards the target
         _dummyBikeHeading += angleDiff * targetApproachFactor;
+        // Add some random wobble to the heading
         _dummyBikeHeading +=
             (_random.nextDouble() * 2 - 1) * maxHeadingChange * 0.5;
-        _dummyBikeHeading = _dummyBikeHeading % (2 * pi);
+        _dummyBikeHeading =
+            _dummyBikeHeading % (2 * pi); // Keep heading within 0 to 2*pi
       } else {
+        // If no target, just wander randomly
         _dummyBikeHeading += (_random.nextDouble() * 2 - 1) * maxHeadingChange;
         _dummyBikeHeading = _dummyBikeHeading % (2 * pi);
       }
 
+      // Calculate new position
       final double latMove = cos(_dummyBikeHeading) * _dummyBikeCurrentSpeed;
       final double currentLatitudeRadians = current.latitude * (pi / 180.0);
-      final double lngCorrectionFactor = cos(currentLatitudeRadians).abs();
+      final double lngCorrectionFactor = cos(
+        currentLatitudeRadians,
+      ).abs().clamp(0.0001, 1.0); // Avoid division by zero near poles
       final double lngMove = sin(_dummyBikeHeading) * _dummyBikeCurrentSpeed;
 
       final LatLng newLocation = LatLng(
@@ -541,12 +787,28 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         current.longitude + (lngMove / lngCorrectionFactor),
       );
 
+      // Keep location within Lalitpur boundary (optional, for realism)
+      // This is a simple boundary check, more complex boundary handling might be needed.
+      if (!_isPointInPolygon(newLocation, _lalitpurBoundary)) {
+        // If outside boundary, try to steer back or clamp
+        // For simplicity, let's just reverse heading slightly if hit boundary
+        _dummyBikeHeading +=
+            pi +
+            (_random.nextDouble() * 0.5 -
+                0.25); // Turn around with some randomness
+        _dummyBikeHeading = _dummyBikeHeading % (2 * pi);
+        debugPrint("DEBUG: Dummy bike hit boundary, re-calculating heading.");
+      }
+
       if (!mounted) return;
       setState(() {
         _activeBikeLocation = newLocation;
       });
 
       if (mounted) {
+        // Only move map if the user is not actively panning/zooming,
+        // or if we want to force follow the bike.
+        // For now, it always follows. Could add a toggle.
         _mapController.move(newLocation, _mapController.zoom);
       }
     });
@@ -554,11 +816,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   bool _isPointInPolygon(LatLng point, List<LatLng> polygon) {
     if (polygon.isEmpty) return false;
+    // Ray-casting algorithm for point in polygon
     int intersectCount = 0;
     for (int i = 0; i < polygon.length; i++) {
       LatLng p1 = polygon[i];
       LatLng p2 = polygon[(i + 1) % polygon.length];
 
+      // Check if ray from point (horizontally right) intersects segment (p1, p2)
       if (((p1.longitude <= point.longitude &&
                   point.longitude < p2.longitude) ||
               (p2.longitude <= point.longitude &&
@@ -571,7 +835,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         intersectCount++;
       }
     }
-    return intersectCount % 2 == 1;
+    return intersectCount % 2 == 1; // Odd intersections means inside
   }
 
   Station? _isNearStation(LatLng point) {
@@ -579,7 +843,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     for (var station in _stations) {
       final stationLatLng = LatLng(station.latitude, station.longitude);
       final double dist = distance(point, stationLatLng);
-      debugPrint("Distance to ${station.name}: $dist meters");
+      // debugPrint("Distance to ${station.name}: ${dist.toStringAsFixed(2)} meters"); // Can be chatty
       if (dist <= _stationReturnRadiusMeters) {
         return station;
       }
@@ -588,6 +852,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _endRide({bool manualEnd = true}) async {
+    debugPrint("DEBUG: _endRide called. Manual end: $manualEnd");
     _rideCountdownTimer?.cancel();
     _dummyBikeMovementTimer?.cancel();
 
@@ -598,8 +863,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           content: Text(
             "❌ Missing ride or bike location data. Cannot end ride.",
           ),
+          backgroundColor: Colors.red,
         ),
       );
+      debugPrint(
+        "ERROR: Cannot end ride: _activeRideId or _activeBikeLocation is null.",
+      );
+      // Reset state forcefully if data is missing but ride was somehow active
       if (mounted) {
         setState(() {
           _isRideActive = false;
@@ -614,56 +884,27 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
 
     LatLng finalEndLocation = _activeBikeLocation!;
-    Station? returnedStation = _isNearStation(finalEndLocation);
-    bool isInLalitpur = _isPointInPolygon(finalEndLocation, _lalitpurBoundary);
-
-    String? endStationId;
-    String returnMessage = '';
-    String penaltyInfo = '';
-    bool canEndRide = false;
-
-    if (returnedStation != null) {
-      endStationId = returnedStation.id;
-      returnMessage = '✅ Ride ended at ${returnedStation.name} station!';
-      canEndRide = true;
-    } else if (isInLalitpur) {
-      returnMessage = '✅ Ride ended successfully within Lalitpur boundary!';
-      canEndRide = true;
-    } else {
-      returnMessage =
-          '❌ Ride cannot be ended outside Lalitpur boundary and not at a station.';
-      penaltyInfo =
-          'A penalty of Rs.100 will be applied if the ride were to end here.';
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            "⚠️ Cannot end ride here. Please return to a station or stay within Lalitpur. $penaltyInfo",
-          ),
-          backgroundColor: Colors.orange,
-          duration: const Duration(seconds: 5),
-        ),
-      );
-      _startRideCountdown();
-      _startDummyBikeMovement();
-      return;
-    }
 
     try {
+      debugPrint(
+        "DEBUG: Calling _apiService.endRide for ride ID: $_activeRideId",
+      );
       final response = await _apiService.endRide(
         rideId: _activeRideId!,
         userLocation: finalEndLocation,
       );
+      if (!mounted) return; // Check mounted after API call
 
-      if (response.containsKey('distance')) {
+      // The backend will always decide success, penalty, etc.
+      if (response['message'] != null) {
         final String distance = response['distance'] ?? 'N/A';
         final double penaltyAmount =
             (response['penaltyAmount'] as num?)?.toDouble() ?? 0.0;
-        final String penaltyReason = response['penaltyReason'] ?? 'No penalty';
+        final String penaltyReason = response['penaltyReason'] ?? '';
         final double finalFare =
             (response['finalFare'] as num?)?.toDouble() ?? 0.0;
+        final String message = response['message'] ?? 'Ride ended';
 
-        if (!mounted) return;
         setState(() {
           _isRideActive = false;
           _activeBikeCode = null;
@@ -672,19 +913,18 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           _rideEndTime = null;
           _remainingRideTime = Duration.zero;
         });
+        debugPrint("DEBUG: Ride successfully ended via API.");
 
-        if (!mounted) return;
         showDialog(
           context: context,
           builder: (BuildContext context) {
             return AlertDialog(
-              title: const Text('✅ Ride Ended Successfully'),
+              title: const Text('✅ Ride Ended'),
               content: Text(
-                '$returnMessage\n\n'
+                '$message\n\n'
                 '📏 Distance: $distance\n'
                 '💰 Fare: Rs. ${finalFare.toStringAsFixed(2)}\n'
-                '⚠️ Penalty: Rs. ${penaltyAmount.toStringAsFixed(2)}\n'
-                '${penaltyReason.isNotEmpty && penaltyAmount > 0 ? 'Reason: $penaltyReason' : ''}',
+                '${penaltyAmount > 0 ? '⚠️ Penalty: Rs. ${penaltyAmount.toStringAsFixed(2)}\nReason: $penaltyReason' : ''}',
               ),
               actions: [
                 TextButton(
@@ -696,14 +936,16 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           },
         );
       } else {
+        // Handle unexpected response or failure
         final String message =
             response['error'] ??
             response['message'] ??
             'Ride could not be ended. Please try again.';
-        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('⚠️ Failed to end ride: $message')),
         );
+        debugPrint("ERROR: API responded with failure to end ride: $message");
+        // If API fails but we thought we could end, restart timers
         if (_isRideActive) {
           _startRideCountdown();
           _startDummyBikeMovement();
@@ -715,17 +957,20 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('❌ Error ending ride: ${e.toString()}')),
       );
+      // If an exception occurs, assume ride is still active and restart timers
       if (_isRideActive) {
         _startRideCountdown();
         _startDummyBikeMovement();
       }
     } finally {
-      await _loadStations();
+      await _loadStations(); // Always refresh stations at the end
     }
   }
 
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
+    if (duration.isNegative)
+      return "00:00"; // Handle negative durations gracefully
     return '${twoDigits(duration.inMinutes)}:${twoDigits(duration.inSeconds.remainder(60))}';
   }
 
@@ -735,27 +980,55 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     _stationRefreshTimer?.cancel();
     _rideCountdownTimer?.cancel();
     _dummyBikeMovementTimer?.cancel();
+    debugPrint(
+      "DEBUG: MapScreen disposed. All timers and controllers cancelled.",
+    );
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Show loading indicator early
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    // Handle case where user profile couldn't be loaded (e.g., bad token)
     if (_userProfile == null) {
-      // This block will be hit if _loadUserProfile fails and doesn't redirect immediately.
-      // The _initialize method now handles the pushReplacementNamed to /login if user is null.
-      return const Scaffold(
-        body: Center(child: Text("Please log in to use the map.")),
+      debugPrint(
+        "WARN: _userProfile is null in build. Displaying login message.",
+      );
+      return Scaffold(
+        appBar: AppBar(title: const Text("Explore Zupito Rides")),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                "Please log in to use the map.",
+                style: TextStyle(fontSize: 18),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pushReplacementNamed(context, '/login');
+                },
+                child: const Text("Go to Login"),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
+    // Only attempt to build FlutterMap if _currentLocation is available
+    // Otherwise, show an indicator
     return Scaffold(
-      backgroundColor: const Color(0xFFE8F0FE),
+      backgroundColor: const Color.fromARGB(255, 122, 55, 223),
       appBar: AppBar(
         title: const Text("Explore Zupito Rides"),
+        backgroundColor: Colors.indigo,
         actions: [
           Consumer<ThemeProvider>(
             builder: (context, themeProvider, _) {
@@ -775,12 +1048,23 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           ),
         ],
       ),
-
-      body: Stack(
-        children: [
-          _currentLocation == null
-              ? const Center(child: CircularProgressIndicator())
-              : FlutterMap(
+      body: _currentLocation == null
+          ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text("Fetching your location..."),
+                  Text(
+                    "Please ensure GPS is enabled and permissions are granted.",
+                  ),
+                ],
+              ),
+            )
+          : Stack(
+              children: [
+                FlutterMap(
                   mapController: _mapController,
                   options: MapOptions(center: _currentLocation!, zoom: 15),
                   children: [
@@ -790,6 +1074,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       retinaMode: RetinaMode.isHighDensity(context),
                       subdomains: const ['a', 'b', 'c'],
                       userAgentPackageName: 'com.example.zupito',
+                      errorImage: const AssetImage(
+                        'assets/images/placeholder_map.png',
+                      ),
                     ),
                     PolylineLayer(
                       polylineCulling: false,
@@ -797,9 +1084,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                         Polyline(
                           points: _lalitpurBoundary + [_lalitpurBoundary.first],
                           strokeWidth: 3,
-                          color: Colors.deepOrange,
-                          borderColor: Colors.deepOrange,
-                          borderStrokeWidth: 1.5,
+                          color: Colors.red,
+                          isDotted: true,
                         ),
                       ],
                     ),
@@ -815,10 +1101,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                               child: Icon(
                                 Icons.location_on,
                                 size: 40,
-                                color:
-                                    station
-                                        .bikes
-                                        .isNotEmpty // Check if the bikes list is not empty
+                                color: station.bikes.isNotEmpty
                                     ? Colors.indigo
                                     : Colors.grey,
                               ),
@@ -854,7 +1137,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                               ],
                             ),
                           ),
-
                         if (_isRideActive && _activeBikeLocation != null)
                           Marker(
                             point: _activeBikeLocation!,
@@ -888,63 +1170,123 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     ),
                   ],
                 ),
-          if (_isRideActive)
-            Positioned(
-              bottom: 20,
-              left: 15,
-              right: 15,
-              child: Card(
-                color: Colors.indigo,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                elevation: 6,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Active Ride: ${_activeBikeCode ?? '---'}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+
+                // Ride active overlay
+                if (_isRideActive)
+                  Positioned(
+                    bottom: 20,
+                    left: 15,
+                    right: 15,
+                    child: Card(
+                      color: Colors.indigo,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      elevation: 6,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Active Ride: ${_activeBikeCode ?? '---'}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Time Left: ${_formatDuration(_remainingRideTime)}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            ElevatedButton.icon(
+                              onPressed: () => _endRide(manualEnd: true),
+                              icon: const Icon(Icons.lock, color: Colors.black),
+                              label: const Text(
+                                "End Ride",
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 10,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Time Left: ${_formatDuration(_remainingRideTime)}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      ElevatedButton.icon(
-                        onPressed: () => _endRide(manualEnd: true),
-                        icon: const Icon(Icons.lock, color: Colors.black),
-                        label: const Text(
-                          "End Ride",
-                          style: TextStyle(color: Colors.black),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
+
+                // eSewa Payment Button - only visible if station selected & ride NOT active
+                if (_selectedStation != null && !_isRideActive)
+                  Positioned(
+                    bottom: 90,
+                    left: 30,
+                    right: 30,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.payment),
+                      label: const Text('Pay with eSewa'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EsewaPaymentScreen(
+                              amount: '100',
+                              pid:
+                                  'ride_${DateTime.now().millisecondsSinceEpoch}',
+                              merchant: 'EPAYTEST',
+                              successUrl: 'https://esewa.com.np/success',
+                              failureUrl: 'https://esewa.com.np/fail',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
             ),
-        ],
-      ),
 
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _moveToNearestStation,
         icon: const Icon(Icons.navigation),
         label: const Text("Nearest Station"),
-        backgroundColor: Colors.deepOrange,
+        backgroundColor: Colors.indigo,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
+  }
+}
+
+extension FirstWhereOrNullExtension<E> on Iterable<E> {
+  E? firstWhereOrNull(bool Function(E element) test) {
+    for (var element in this) {
+      if (test(element)) return element;
+    }
+    return null;
   }
 }

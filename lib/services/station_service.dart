@@ -11,20 +11,37 @@ class StationService {
     final response = await http.get(url);
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
+      final decoded = jsonDecode(response.body);
 
-      // ✅ Safely map each station
-      final stations = (data['stations'] as List).map((stationJson) {
-        // Debug log bike codes to verify they are not null
-        final bikes = (stationJson['bikes'] as List?) ?? [];
-        for (var bike in bikes) {
-  print("📦 Bike JSON: ${jsonEncode(bike)}");
-}
+      List rawList;
 
-        
+      // Accept either a wrapped or raw array
+      if (decoded is Map<String, dynamic> && decoded.containsKey('stations')) {
+        rawList = decoded['stations'] as List;
+      } else if (decoded is List) {
+        rawList = decoded;
+      } else {
+        throw Exception('Unexpected stations response format.');
+      }
 
-        return Station.fromJson(stationJson);
-      }).toList();
+      // Optional: Print any bad entry
+      for (var item in rawList) {
+        if (item is! Map<String, dynamic>) {
+          print('❌ Bad station entry: $item (${item.runtimeType})');
+        }
+      }
+
+      // Filter out non-maps and map to Station
+      final stations = rawList
+          .where((item) => item is Map<String, dynamic>)
+          .map((stationJson) {
+            final bikes = (stationJson['bikes'] as List?) ?? [];
+            for (var bike in bikes) {
+              print("📦 Bike JSON: ${jsonEncode(bike)}");
+            }
+            return Station.fromJson(stationJson as Map<String, dynamic>);
+          })
+          .toList();
 
       return stations;
     } else {

@@ -29,8 +29,10 @@ class _StationListScreenState extends State<StationListScreen> {
     try {
       final List<dynamic> stationData = await AdminApiService.fetchStations();
       setState(() {
-        // Map the raw JSON data to a list of Station objects
-        _stations = stationData.map((json) => Station.fromJson(json)).toList();
+        _stations = stationData
+            .where((json) => json is Map<String, dynamic>)
+            .map((json) => Station.fromJson(json as Map<String, dynamic>))
+            .toList();
       });
     } catch (e) {
       setState(() {
@@ -219,34 +221,48 @@ class _StationListScreenState extends State<StationListScreen> {
   Widget build(BuildContext context) {
     // Removed AppBar as it's handled by AdminHomeScreen
     return RefreshIndicator(
-      // Added RefreshIndicator for pull-to-refresh
       onRefresh: _fetchStations,
       child: Stack(
-        // Use Stack to position the FloatingActionButton
         children: [
           _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(_error!, textAlign: TextAlign.center),
-                      const SizedBox(height: 10),
-                      ElevatedButton(
-                        onPressed: _fetchStations,
-                        child: const Text('Retry'),
+              ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    SizedBox(
+                      height: MediaQuery.of(context).size.height * 0.6,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(_error!, textAlign: TextAlign.center),
+                            const SizedBox(height: 10),
+                            ElevatedButton(
+                              onPressed: _fetchStations,
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 )
               : _stations.isEmpty
-              ? const Center(
-                  child: Text(
-                    'No stations found. Click + to add one.',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                    textAlign: TextAlign.center,
-                  ),
+              ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: const [
+                    SizedBox(
+                      height: 320,
+                      child: Center(
+                        child: Text(
+                          'No stations found. Click + to add one.',
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ],
                 )
               : ListView.builder(
                   itemCount: _stations.length,
@@ -254,8 +270,7 @@ class _StationListScreenState extends State<StationListScreen> {
                     final station = _stations[index];
                     return StationCard(
                       station: station,
-                      onDelete: () =>
-                          _deleteStation(station.id), // Pass delete callback
+                      onDelete: () => _deleteStation(station.id),
                     );
                   },
                 ),

@@ -97,46 +97,56 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(_error!, textAlign: TextAlign.center),
-                  const SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: _fetchRideHistory,
-                    child: const Text('Retry'),
+          ? ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.6,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_error!, textAlign: TextAlign.center),
+                        const SizedBox(height: 10),
+                        ElevatedButton(
+                          onPressed: _fetchRideHistory,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             )
           : rideHistory.isEmpty
-          ? const Center(child: Text("No ride history found."))
+          ? ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: const [
+                SizedBox(
+                  height: 320,
+                  child: Center(
+                    child: Text(
+                      "No ride history found.",
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  ),
+                ),
+              ],
+            )
           : ListView.builder(
               padding: const EdgeInsets.all(12),
               itemCount: rideHistory.length,
               itemBuilder: (context, index) {
                 final ride = rideHistory[index];
-                // Add debug prints for individual ride data
-                debugPrint('Displaying Ride: $ride');
-                debugPrint(
-                  'Start Station: ${ride['startStation']}, End Station: ${ride['destinationStation']}',
-                ); // Use destinationStation
-                debugPrint(
-                  'Start Time: ${ride['startTime']}, End Time: ${ride['endTime']}',
-                );
-
-                // Access populated fields correctly
+                // ... rest of your code remains unchanged ...
                 final startStationName =
                     ride['startStation']?['name'] ?? 'Unknown';
                 final destinationStationName =
                     ride['destinationStation']?['name'] ?? 'Unknown';
                 final fare = (ride['fare'] as num?)?.toDouble() ?? 0.0;
                 final penalty =
-                    (ride['penaltyAmount'] as num?)?.toDouble() ??
-                    0.0; // Use penaltyAmount
+                    (ride['penaltyAmount'] as num?)?.toDouble() ?? 0.0;
 
-                // Safely parse startTime
                 DateTime? startTime;
                 if (ride['startTime'] is String) {
                   try {
@@ -151,7 +161,6 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                 final endTimeStr = ride['endTime'];
                 String durationStr = '';
 
-                // Calculate ride duration if ended and times are valid
                 if (startTime != null && endTimeStr is String) {
                   try {
                     final endTime = DateTime.parse(endTimeStr);
@@ -180,9 +189,7 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                       size: 30,
                       color: Colors.indigo,
                     ),
-                    title: Text(
-                      '$startStationName → $destinationStationName',
-                    ), // Use populated names
+                    title: Text('$startStationName → $destinationStationName'),
                     subtitle: Text(
                       '📅 $dateStr${durationStr.isNotEmpty ? '\n$durationStr' : ''}',
                     ),

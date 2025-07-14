@@ -3,15 +3,13 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class SecureStorageService {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
-  // Keys for different types of stored data
-  static const _adminTokenKey =
-      'admin_auth_token'; // Explicitly for admin JWT token
-  static const _userAuthTokenKey =
-      'user_auth_token'; // Explicitly for user JWT token
-  static const _userProfileDataKey =
-      'user_profile_data'; // For the full user JSON profile
+  // Consistent Keys
+  static const _adminTokenKey = 'admin_token'; // Admin JWT token
+  static const _userAuthTokenKey = 'user_auth_token'; // User JWT token
+  static const _userProfileDataKey = 'user_profile_data'; // User profile JSON
 
   // --- Admin Token Methods ---
+
   Future<void> writeAdminToken(String token) async {
     await _storage.write(key: _adminTokenKey, value: token);
   }
@@ -25,7 +23,7 @@ class SecureStorageService {
   }
 
   // --- User Authentication Token Methods ---
-  // This is for the JWT token received upon user login
+
   Future<void> writeUserAuthToken(String token) async {
     await _storage.write(key: _userAuthTokenKey, value: token);
   }
@@ -39,7 +37,7 @@ class SecureStorageService {
   }
 
   // --- User Profile Data Methods (the full user JSON) ---
-  // This stores the full user object (e.g., {"_id": "...", "username": "...", "email": "..."})
+
   Future<void> writeUserProfile(String userJson) async {
     await _storage.write(key: _userProfileDataKey, value: userJson);
   }
@@ -53,12 +51,19 @@ class SecureStorageService {
   }
 
   // --- General Clear Method ---
-  // This will clear all relevant keys for a full logout/reset
+  /// Use this to clear ALL relevant secure storage (on logout/reset)
   Future<void> clearAllSecureData() async {
     await _storage.delete(key: _adminTokenKey);
     await _storage.delete(key: _userAuthTokenKey);
     await _storage.delete(key: _userProfileDataKey);
-    // If you had any other specific keys like 'user_id', add them here too
+    // Add more deletes here if you add more secure keys
+  }
+
+  // --- (Optional) One-time migration/cleanup for old keys ---
+  /// Call this once if you had previously used wrong keys
+  Future<void> cleanupOldKeys() async {
+    await _storage.delete(key: 'admin_auth_token');
+    // Add any other old/legacy keys here if needed
   }
 
   Future readUser() async {}

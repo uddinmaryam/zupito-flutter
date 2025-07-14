@@ -1,27 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:zupito/models/bike.dart'; // Import the Bike model
+import 'package:zupito/models/bike.dart';
 
 class BikeCard extends StatelessWidget {
-  final Bike bike; // Now accepts a Bike object
-  final VoidCallback? onDelete; // Callback for delete action
+  final Bike bike;
+  final VoidCallback? onDelete;
 
-  const BikeCard({
-    super.key,
-    required this.bike,
-    this.onDelete, // Initialize the onDelete callback
-  });
+  const BikeCard({super.key, required this.bike, this.onDelete});
 
   @override
   Widget build(BuildContext context) {
-    // Access properties directly from the Bike object
-    final String assignedStationText = bike.assignedStation != null && bike.assignedStation!.isNotEmpty
+    final String code = bike.code ?? 'N/A';
+    final double? lat = bike.lat;
+    final double? lng = bike.lng;
+    final String assignedStationText =
+        (bike.assignedStation != null && bike.assignedStation!.isNotEmpty)
         ? 'Station ID: ${bike.assignedStation}'
         : 'Not Assigned';
 
-    // The backend's Bike model doesn't seem to have 'currentStation' or 'autoUnlockAt'
-    // It has 'location' (lat, lng) and 'isAvailable'.
-    // If you need 'currentStation' or 'autoUnlockAt', your backend's Bike model needs to include them.
-    // For now, I'll use the available fields.
+    final bool isAvailable = bike.isAvailable ?? false;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -40,7 +36,7 @@ class BikeCard extends StatelessWidget {
                     const Icon(Icons.qr_code, color: Colors.blueAccent),
                     const SizedBox(width: 8),
                     Text(
-                      'Code: ${bike.code}', // Display bike code
+                      'Code: $code',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -49,11 +45,10 @@ class BikeCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                // Delete button
                 if (onDelete != null)
                   IconButton(
                     icon: const Icon(Icons.delete, color: Colors.redAccent),
-                    onPressed: onDelete, // Trigger the onDelete callback
+                    onPressed: onDelete,
                     tooltip: 'Delete Bike',
                   ),
               ],
@@ -61,11 +56,17 @@ class BikeCard extends StatelessWidget {
             const SizedBox(height: 8),
             Row(
               children: [
-                const Icon(Icons.location_on_outlined, size: 18, color: Colors.grey),
+                const Icon(
+                  Icons.location_on_outlined,
+                  size: 18,
+                  color: Colors.grey,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Location: Lat ${bike.location['lat']?.toStringAsFixed(4)}, Lng ${bike.location['lng']?.toStringAsFixed(4)}',
+                    (lat != null && lng != null)
+                        ? 'Location: Lat ${lat.toStringAsFixed(4)}, Lng ${lng.toStringAsFixed(4)}'
+                        : 'Location: N/A',
                     style: const TextStyle(fontSize: 14, color: Colors.black87),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -79,7 +80,7 @@ class BikeCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    assignedStationText, // Display assigned station
+                    assignedStationText,
                     style: const TextStyle(fontSize: 14, color: Colors.black87),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -90,17 +91,17 @@ class BikeCard extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  bike.isAvailable ? Icons.lock_open : Icons.lock,
-                  color: bike.isAvailable ? Colors.green : Colors.red,
+                  isAvailable ? Icons.lock_open : Icons.lock,
+                  color: isAvailable ? Colors.green : Colors.red,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  bike.isAvailable ? 'Available' : 'In Use',
+                  isAvailable ? 'Available' : 'In Use',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: bike.isAvailable ? Colors.green : Colors.red,
+                    color: isAvailable ? Colors.green : Colors.red,
                   ),
                 ),
               ],
