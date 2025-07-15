@@ -3,10 +3,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart'
-    as geo; // Using alias to avoid conflict with Location package
+    as geolocator; // Using alias to avoid conflict with Location package
 import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
@@ -404,58 +403,84 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   Future<void> _initLocation() async {
     try {
-      geo.LocationPermission permission = geo.LocationPermission.always;
-
-      // ✅ Skip permission handling on Web to avoid JS crash
-      if (!kIsWeb) {
-        permission = await geo.Geolocator.checkPermission();
-
-        if (permission == geo.LocationPermission.denied) {
-          permission = await geo.Geolocator.requestPermission();
-          if (permission == geo.LocationPermission.denied) {
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Location permissions are denied.')),
-            );
-            throw Exception('Location permissions are denied');
-          }
-        }
-
-        if (permission == geo.LocationPermission.deniedForever) {
+      // Check if location services are enabled
+      bool serviceEnabled = await _location.serviceEnabled();
+      if (!serviceEnabled) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text("Location services are disabled. Requesting to enable..."),
+          ),
+        );
+        serviceEnabled = await _location.requestService();
+        if (!serviceEnabled) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Text(
-                'Location permissions are permanently denied. Please enable them from your ${kIsWeb ? "browser" : "device"} settings.',
-              ),
+                  "Location services denied. Please enable them manually."),
             ),
           );
-          throw Exception('Location permissions are permanently denied');
+          throw Exception("Location services are disabled.");
         }
       }
 
-      // ✅ Now fetch the current position (browser will prompt if needed)
-      final pos = await geo.Geolocator.getCurrentPosition(
-        desiredAccuracy: geo.LocationAccuracy.high,
-      );
+      // Check location permissions
+      PermissionStatus permission = await _location.hasPermission();
+      if (permission == PermissionStatus.denied) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text("Location permission denied. Requesting permission..."),
+          ),
+        );
+        permission = await _location.requestPermission();
+        if (permission != PermissionStatus.granted) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  "Permission permanently denied. Grant it from settings."),
+            ),
+          );
+          throw Exception("Location permission denied.");
+        }
+      }
 
-      final userLoc = LatLng(pos.latitude, pos.longitude);
+      // Get initial location
+      final loc = await _location.getLocation();
+      if (loc.latitude == null || loc.longitude == null) {
+        throw Exception("Location data is null.");
+      }
 
+      final userLoc = LatLng(loc.latitude!, loc.longitude!);
       if (!mounted) return;
       setState(() {
         _currentLocation = userLoc;
       });
 
-      // ✅ Start location updates
-      geo.Geolocator.getPositionStream(
-        locationSettings: geo.LocationSettings(
-          accuracy: geo.LocationAccuracy.high,
-          distanceFilter: 10,
-        ),
-      ).listen((pos) {
-        if (!mounted) return;
+      // Fit camera AFTER map has rendered
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_currentLocation != null) {
+          // Corrected for flutter_map v8: use _mapController.fitCamera
+          // The 'move' method is for LatLng and zoom, not CameraFit.bounds
+          _mapController.fitCamera(
+            CameraFit.bounds(
+              bounds: LatLngBounds.fromPoints([_currentLocation!]),
+              padding: const EdgeInsets.all(20), // Use const for EdgeInsets
+            ),
+            // source: MapEventSource.programmatic, // Removed in flutter_map v8
+          );
+        }
+      });
+
+      // Listen for live location updates
+      _location.onLocationChanged.listen((loc) {
+        if (!mounted || loc.latitude == null || loc.longitude == null) return;
         setState(() {
-          _currentLocation = LatLng(pos.latitude, pos.longitude);
+          _currentLocation = LatLng(loc.latitude!, loc.longitude!);
         });
       });
     } catch (e) {
