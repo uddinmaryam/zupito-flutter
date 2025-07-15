@@ -6,7 +6,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart'
-    as geolocator; // Using alias to avoid conflict with Location package
+    as geo; // Using alias to avoid conflict with Location package
 import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
@@ -401,114 +401,115 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       debugPrint("INFO: User profile not found in secure storage.");
     }
   }
-
-  Future<void> _initLocation() async {
-    try {
-      if (kIsWeb) {
-        // For web/desktop, use Geolocator only
-        geolocator.LocationPermission permission =
-            await geolocator.Geolocator.checkPermission();
-        if (permission == geolocator.LocationPermission.denied) {
-          permission = await geolocator.Geolocator.requestPermission();
-          if (permission == geolocator.LocationPermission.denied) {
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Location permissions are denied.')),
-            );
-            throw Exception('Location permissions are denied');
-          }
-        }
-        if (permission == geolocator.LocationPermission.deniedForever) {
+Future<void> _initLocation() async {
+  try {
+    if (kIsWeb) {
+      // For web/desktop, use Geolocator only
+      geo.LocationPermission permission =
+          await geo.Geolocator.checkPermission();
+      if (permission == geo.LocationPermission.denied) {
+        permission = await geo.Geolocator.requestPermission();
+        if (permission == geo.LocationPermission.denied) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  'Location permissions are permanently denied. Please enable them from your browser settings.'),
-            ),
+            const SnackBar(content: Text('Location permissions are denied.')),
           );
-          throw Exception('Location permissions are permanently denied');
+          throw Exception('Location permissions are denied');
         }
-
-        // Get the current position
-        final pos = await geolocator.Geolocator.getCurrentPosition(
-            desiredAccuracy: geolocator.LocationAccuracy.high);
-
-        final userLoc = LatLng(pos.latitude, pos.longitude);
-
-        if (!mounted) return;
-        setState(() {
-          _currentLocation = userLoc;
-        });
-
-        // Listen for live updates
-        geolocator.Geolocator.getPositionStream(
-          locationSettings: geolocator.LocationSettings(
-            accuracy: geolocator.LocationAccuracy.high,
-            distanceFilter: 10,
-          ),
-        ).listen((pos) {
-          if (!mounted) return;
-          setState(() {
-            _currentLocation = LatLng(pos.latitude, pos.longitude);
-          });
-        });
-      } else {
-        // For mobile apps (Android/iOS), you can keep using your old location logic if you want,
-        // or use Geolocator for all platforms.
-        geolocator.LocationPermission permission =
-            await geolocator.Geolocator.checkPermission();
-        if (permission == geolocator.LocationPermission.denied) {
-          permission = await geolocator.Geolocator.requestPermission();
-          if (permission == geolocator.LocationPermission.denied) {
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Location permissions are denied.')),
-            );
-            throw Exception('Location permissions are denied');
-          }
-        }
-        if (permission == geolocator.LocationPermission.deniedForever) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  'Location permissions are permanently denied. Please enable them from settings.'),
-            ),
-          );
-          throw Exception('Location permissions are permanently denied');
-        }
-
-        final pos = await geolocator.Geolocator.getCurrentPosition(
-            desiredAccuracy: geolocator.LocationAccuracy.high);
-
-        final userLoc = LatLng(pos.latitude, pos.longitude);
-
-        if (!mounted) return;
-        setState(() {
-          _currentLocation = userLoc;
-        });
-
-        geolocator.Geolocator.getPositionStream(
-          locationSettings: geolocator.LocationSettings(
-            accuracy: geolocator.LocationAccuracy.high,
-            distanceFilter: 10,
-          ),
-        ).listen((pos) {
-          if (!mounted) return;
-          setState(() {
-            _currentLocation = LatLng(pos.latitude, pos.longitude);
-          });
-        });
       }
-    } catch (e) {
-      debugPrint("ERROR during location init: $e");
-      if (mounted) {
+      if (permission == geo.LocationPermission.deniedForever) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Location error: ${e.toString()}")),
+          const SnackBar(
+            content: Text(
+                'Location permissions are permanently denied. Please enable them from your browser settings.'),
+          ),
         );
+        throw Exception('Location permissions are permanently denied');
       }
+
+      // Get the current position
+      final pos = await geo.Geolocator.getCurrentPosition(
+          desiredAccuracy: geo.LocationAccuracy.high);
+
+      final userLoc = LatLng(pos.latitude, pos.longitude);
+
+      if (!mounted) return;
+      setState(() {
+        _currentLocation = userLoc;
+      });
+
+      // Listen for live updates
+      geo.Geolocator.getPositionStream(
+        locationSettings: geo.LocationSettings(
+          accuracy: geo.LocationAccuracy.high,
+          distanceFilter: 10,
+        ),
+      ).listen((pos) {
+        if (!mounted) return;
+        setState(() {
+          _currentLocation = LatLng(pos.latitude, pos.longitude);
+        });
+      });
+    } else {
+      // For mobile apps (Android/iOS), you can keep using your old location logic if you want,
+      // or use Geolocator for all platforms.
+      geo.LocationPermission permission =
+          await geo.Geolocator.checkPermission();
+      if (permission == geo.LocationPermission.denied) {
+        permission = await geo.Geolocator.requestPermission();
+        if (permission == geo.LocationPermission.denied) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permissions are denied.')),
+          );
+          throw Exception('Location permissions are denied');
+        }
+      }
+      if (permission == geo.LocationPermission.deniedForever) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Location permissions are permanently denied. Please enable them from settings.'),
+          ),
+        );
+        throw Exception('Location permissions are permanently denied');
+      }
+
+      final pos = await geo.Geolocator.getCurrentPosition(
+          desiredAccuracy: geo.LocationAccuracy.high);
+
+      final userLoc = LatLng(pos.latitude, pos.longitude);
+
+      if (!mounted) return;
+      setState(() {
+        _currentLocation = userLoc;
+      });
+
+      geo.Geolocator.getPositionStream(
+        locationSettings: geo.LocationSettings(
+          accuracy: geo.LocationAccuracy.high,
+          distanceFilter: 10,
+        ),
+      ).listen((pos) {
+        if (!mounted) return;
+        setState(() {
+          _currentLocation = LatLng(pos.latitude, pos.longitude);
+        });
+      });
+    }
+  } catch (e) {
+    debugPrint("ERROR during location init: $e");
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Location error: ${e.toString()}")),
+      );
     }
   }
+}
+
+  
 
   Future<void> _loadStations() async {
     try {
