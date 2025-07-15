@@ -14,6 +14,8 @@ import 'package:provider/provider.dart';
 import 'package:zupito/models/station.dart';
 import 'package:zupito/models/user.dart';
 import 'package:zupito/providers/theme_provider.dart';
+import 'package:zupito/screens/payment_service.dart';
+import 'package:zupito/screens/paypal_webview.dart';
 import 'package:zupito/services/api_service.dart';
 import 'package:zupito/services/otp_socket_service.dart';
 import 'package:zupito/services/secure_storage_services.dart';
@@ -1012,7 +1014,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
     // Handle case where user profile couldn't be loaded (e.g., bad token)
     if (_userProfile == null) {
-      // This should ideally be handled by the _initialize redirect, but as a fallback:
       debugPrint(
         "WARN: _userProfile is null in build. Displaying login message.",
       );
@@ -1055,7 +1056,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
                 ),
                 onPressed: () {
-                  // Corrected: Pass the opposite of the current theme state to toggle it
                   themeProvider.toggleTheme(!themeProvider.isDarkMode);
                 },
               );
@@ -1087,39 +1087,25 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 FlutterMap(
                   mapController: _mapController,
                   options: MapOptions(
-                    // Use initialCenter instead of center
                     initialCenter: _currentLocation!,
-                    // Use initialZoom instead of zoom
                     initialZoom: 15.0,
-                    // Interactive Flags: Only allow necessary interactions if the map feels "stuck"
-                    // interactiveFlags: InteractiveFlag.all & ~InteractiveFlag.rotate, // Example: disable rotation
                   ),
                   children: [
                     TileLayer(
-                      // This is the standard OpenStreetMap tile server.
-                      // If your map is blank, double-check device internet connectivity
-                      // or network/firewall issues blocking access to this URL.
                       urlTemplate:
                           'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                       retinaMode: RetinaMode.isHighDensity(context),
                       subdomains: const ['a', 'b', 'c'],
-                      userAgentPackageName:
-                          'com.example.zupito', // Important for some tile providers
-                      errorImage: const AssetImage(
-                        'assets/images/placeholder_map.png',
-                      ), // Optional: show a fallback image on tile load error
+                      userAgentPackageName: 'com.example.zupito',
+                      errorImage:
+                          const AssetImage('assets/images/placeholder_map.png'),
                     ),
                     PolylineLayer(
-                      // polylineCulling: false, // Removed in flutter_map v8
                       polylines: [
                         Polyline(
-                          points: _lalitpurBoundary +
-                              [_lalitpurBoundary.first], // Close the polygon
+                          points: _lalitpurBoundary + [_lalitpurBoundary.first],
                           strokeWidth: 3,
                           color: Colors.red,
-                          // isDotted: true, // Removed in flutter_map v8
-                          // borderColor: Colors.deepOrange, // No borderColor property for Polyline
-                          // borderStrokeWidth: 1.5,
                         ),
                       ],
                     ),
@@ -1137,7 +1123,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                                 size: 40,
                                 color: station.bikes.isNotEmpty
                                     ? Colors.indigo
-                                    : Colors.grey, // Grey if no bikes
+                                    : Colors.grey,
                               ),
                             ),
                           ),
@@ -1158,15 +1144,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       color: Colors.blue.withOpacity(
-                                        1 -
-                                            _rippleController
-                                                .value, // Fade out as it expands
+                                        1 - _rippleController.value,
                                       ),
                                     ),
                                   ),
                                 ),
                                 const Icon(
-                                  Icons.person_pin_circle, // User location icon
+                                  Icons.person_pin_circle,
                                   size: 36,
                                   color: Colors.blue,
                                 ),
@@ -1189,15 +1173,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       color: Colors.green.withOpacity(
-                                        1 -
-                                            _rippleController
-                                                .value, // Fade out as it expands
+                                        1 - _rippleController.value,
                                       ),
                                     ),
                                   ),
                                 ),
                                 const Icon(
-                                  Icons.pedal_bike, // Bike icon
+                                  Icons.pedal_bike,
                                   size: 36,
                                   color: Colors.black,
                                 ),
@@ -1208,7 +1190,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     ),
                   ],
                 ),
-                // Ride active overlay
                 if (_isRideActive)
                   Positioned(
                     bottom: 20,
@@ -1272,17 +1253,22 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               ],
             ),
 
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _moveToNearestStation,
-        icon: const Icon(Icons.navigation),
-        label: const Text("Nearest Station"),
-        backgroundColor: Colors.indigo,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30),
-        ), // More modern look
+      // <-- Updated FloatingActionButton section starts here
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton.extended(
+            onPressed: _moveToNearestStation,
+            icon: const Icon(Icons.navigation),
+            label: const Text("Nearest Station"),
+            backgroundColor: Colors.indigo,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30),
+            ),
+          ),
+        ],
       ),
-      floatingActionButtonLocation:
-          FloatingActionButtonLocation.endFloat, // Place at bottom-right
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }

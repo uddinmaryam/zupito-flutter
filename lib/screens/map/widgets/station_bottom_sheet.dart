@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:zupito/models/bike.dart';
+import 'package:zupito/screens/payment_service.dart';
+import 'package:zupito/screens/paypal_webview.dart';
 import 'package:zupito/services/api_service.dart';
 import 'package:zupito/utils/top_notification.dart';
 import 'package:zupito/models/station.dart';
@@ -453,24 +455,47 @@ class _BikeCardState extends State<_BikeCard> {
                 ElevatedButton(
                   onPressed: () async {
                     Navigator.of(ctx).pop(); // Close dialog
-                    showTopNotification(context, "✅ Dummy Payment Successful!");
-                    // Simulate a slight delay for payment processing
-                    await Future.delayed(const Duration(milliseconds: 500));
-                    await _startRide(
-                      bike,
-                      selectedDuration, // Pass selected duration
-                      selectedDuration *
-                          _pricePerMinute, // Calculate estimated cost
-                      _selectedDestinationStation?.id ?? widget.station.id,
+                    double amount = selectedDuration * _pricePerMinute;
+
+                    // 1. Create PayPal order on backend
+                    String? approvalUrl =
+                        await PaymentService.createPayPalOrder(amount);
+                    if (approvalUrl == null) {
+                      showTopNotification(
+                          context, "❌ Failed to create PayPal order.");
+                      return;
+                    }
+
+                    // 2. Open PayPal WebView and wait for payment result
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (ctx) =>
+                            PayPalWebView(approvalUrl: approvalUrl),
+                      ),
                     );
+
+                    // 3. If payment was successful, start ride
+                    if (result == 'success') {
+                      showTopNotification(
+                          context, "✅ PayPal Payment Successful!");
+                      await _startRide(
+                        bike,
+                        selectedDuration, // Pass selected duration
+                        amount,
+                        _selectedDestinationStation?.id ?? widget.station.id,
+                      );
+                    } else {
+                      showTopNotification(
+                          context, "❌ Payment cancelled or failed.");
+                    }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green, // Green for success
+                    backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
                   ),
-                  child: const Text("Confirm Payment and Start Ride"),
+                  child: const Text("Pay with PayPal & Start Ride"),
                 ),
-                // Removed the second "Confirm Ride" button as requested
               ],
             );
           },
