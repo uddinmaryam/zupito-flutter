@@ -82,8 +82,7 @@ class ApiService {
         String errorMessage = 'Unknown error';
         try {
           final errorBody = json.decode(response.body);
-          errorMessage =
-              errorBody['message'] ??
+          errorMessage = errorBody['message'] ??
               errorBody['error'] ??
               'Server responded with status ${response.statusCode}';
         } catch (e) {
@@ -142,6 +141,8 @@ class ApiService {
   Future<Map<String, dynamic>> endRide({
     required String rideId,
     required LatLng userLocation,
+    required double endLat,
+    required double endLng,
   }) async {
     final url = Uri.parse('$_baseUrl/rides/end');
 
@@ -318,6 +319,19 @@ class ApiService {
     } catch (e) {
       debugPrint('Error calling getBikes API: $e');
       throw Exception('Error calling getBikes API: $e');
+    }
+  }
+  // import your model
+
+  Future<List<User>> fetchUsers() async {
+    final response =
+        await http.get(Uri.parse("https://your-backend-url.com/api/users"));
+
+    if (response.statusCode == 200) {
+      List<dynamic> usersJson = json.decode(response.body);
+      return usersJson.map((userJson) => User.fromJson(userJson)).toList();
+    } else {
+      throw Exception("Failed to load users");
     }
   }
 }

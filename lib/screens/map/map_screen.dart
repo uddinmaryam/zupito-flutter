@@ -215,7 +215,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         _startRideCountdown();
         _startDummyBikeMovement();
         if (_activeBikeLocation != null && mounted) {
-          _mapController.move(_activeBikeLocation!, 17.0);
+          // Use .camera.zoom for MapController in flutter_map v8
+          _mapController.move(_activeBikeLocation!, _mapController.camera.zoom);
           debugPrint("DEBUG: Map centered on active bike location.");
         }
         debugPrint("DEBUG: Active ride found: $_activeBikeCode");
@@ -297,9 +298,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           );
 
           if (fullStation != null) {
+            // Use .camera.zoom for MapController in flutter_map v8
             _mapController.move(
               LatLng(fullStation.latitude, fullStation.longitude),
-              17.0,
+              _mapController.camera.zoom, // Updated
             );
             debugPrint(
               "DEBUG: Map moved to nearest station: ${fullStation.name}",
@@ -315,12 +317,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               latitude: fallbackStationData['latitude'],
               longitude: fallbackStationData['longitude'],
               capacity: fallbackStationData['capacity'] ?? 10,
-              bikes:
-                  [], // Bikes might not be included in the 'nearest' endpoint response
+              bikes: [], // Bikes might not be included in the 'nearest' endpoint response
             );
+            // Use .camera.zoom for MapController in flutter_map v8
             _mapController.move(
               LatLng(fallbackStation.latitude, fallbackStation.longitude),
-              17.0,
+              _mapController.camera.zoom, // Updated
             );
             debugPrint(
               "DEBUG: Map moved to fallback nearest station: ${fallbackStation.name}",
@@ -398,108 +400,95 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _initLocation() async {
-    bool serviceEnabled = await _location.serviceEnabled();
-    if (!serviceEnabled) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Location services are disabled. Requesting to enable...",
-          ),
-        ),
-      );
-      serviceEnabled = await _location.requestService();
+    try {
+      // Check if location services are enabled
+      bool serviceEnabled = await _location.serviceEnabled();
       if (!serviceEnabled) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              "Location services denied. Please enable them manually.",
-            ),
+            content:
+                Text("Location services are disabled. Requesting to enable..."),
           ),
         );
-        throw Exception("Location services are disabled.");
+        serviceEnabled = await _location.requestService();
+        if (!serviceEnabled) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  "Location services denied. Please enable them manually."),
+            ),
+          );
+          throw Exception("Location services are disabled.");
+        }
       }
-    }
-    debugPrint("DEBUG: Location service enabled.");
 
-    PermissionStatus permissionGranted = await _location.hasPermission();
-    if (permissionGranted == PermissionStatus.denied) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Location permission denied. Requesting permission..."),
-        ),
-      );
-      permissionGranted = await _location.requestPermission();
-      if (permissionGranted != PermissionStatus.granted) {
+      // Check location permissions
+      PermissionStatus permission = await _location.hasPermission();
+      if (permission == PermissionStatus.denied) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              "Location permission permanently denied. Please grant it in settings.",
+            content:
+                Text("Location permission denied. Requesting permission..."),
+          ),
+        );
+        permission = await _location.requestPermission();
+        if (permission != PermissionStatus.granted) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  "Permission permanently denied. Grant it from settings."),
             ),
-          ),
-        );
-        throw Exception("Location permission denied.");
+          );
+          throw Exception("Location permission denied.");
+        }
       }
-    }
-    debugPrint("DEBUG: Location permission granted.");
 
-    LocationData? loc;
-    try {
-      loc = await _location.getLocation();
-      debugPrint(
-        "DEBUG: Initial location fetched: ${loc?.latitude}, ${loc?.longitude}",
-      );
-    } catch (e) {
-      debugPrint("ERROR: Error getting initial location: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Failed to get initial location: ${e.toString()}"),
-          ),
-        );
+      // Get initial location
+      final loc = await _location.getLocation();
+      if (loc.latitude == null || loc.longitude == null) {
+        throw Exception("Location data is null.");
       }
-      throw Exception("Could not get initial location: ${e.toString()}");
-    }
 
-    if (loc != null && loc.latitude != null && loc.longitude != null) {
       final userLoc = LatLng(loc.latitude!, loc.longitude!);
       if (!mounted) return;
       setState(() {
         _currentLocation = userLoc;
       });
-      debugPrint("DEBUG: _currentLocation set to: $_currentLocation");
 
+      // Fit camera AFTER map has rendered
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _currentLocation != null) {
-          _mapController.move(_currentLocation!, 15);
-          debugPrint("DEBUG: Map controller moved to initial location.");
+        if (_currentLocation != null) {
+          // Corrected for flutter_map v8: use _mapController.fitCamera
+          // The 'move' method is for LatLng and zoom, not CameraFit.bounds
+          _mapController.fitCamera(
+            CameraFit.bounds(
+              bounds: LatLngBounds.fromPoints([_currentLocation!]),
+              padding: const EdgeInsets.all(20), // Use const for EdgeInsets
+            ),
+            // source: MapEventSource.programmatic, // Removed in flutter_map v8
+          );
         }
       });
-    } else {
-      debugPrint("ERROR: Initial location data is null or incomplete.");
-      throw Exception("Could not get initial location.");
-    }
 
-    // Listen for location changes
-    _location.onLocationChanged.listen((loc) {
-      if (!mounted) {
-        // Check mounted inside the stream listener
-        debugPrint(
-          "DEBUG: Location stream received data but widget not mounted.",
-        );
-        return;
-      }
-      if (loc.latitude != null && loc.longitude != null) {
-        final updatedLoc = LatLng(loc.latitude!, loc.longitude!);
+      // Listen for live location updates
+      _location.onLocationChanged.listen((loc) {
+        if (!mounted || loc.latitude == null || loc.longitude == null) return;
         setState(() {
-          _currentLocation = updatedLoc;
+          _currentLocation = LatLng(loc.latitude!, loc.longitude!);
         });
-        // debugPrint("DEBUG: Location updated to: $updatedLoc"); // Too chatty, uncomment for specific debugging
+      });
+    } catch (e) {
+      debugPrint("ERROR during location init: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Location error: ${e.toString()}")),
+        );
       }
-    });
+    }
   }
 
   Future<void> _loadStations() async {
@@ -579,7 +568,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
           if (mounted) {
             // Re-check mounted after setState
-            _mapController.move(bikeStartLocation, 17.0);
+            // Use .camera.zoom for MapController in flutter_map v8
+            _mapController.move(
+                bikeStartLocation, _mapController.camera.zoom); // Updated
             debugPrint("DEBUG: Map moved to bike start location.");
           }
 
@@ -676,8 +667,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       );
     }
 
-    _dummyBikeCurrentSpeed =
-        0.00005 +
+    _dummyBikeCurrentSpeed = 0.00005 +
         _random.nextDouble() * 0.00005; // Base speed + random variation
     _dummyBikeHeading = _random.nextDouble() * 2 * pi; // Random initial heading
 
@@ -720,9 +710,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           setState(() {
             _activeBikeLocation = targetLatLng; // Snap to target
             _dummyBikeCurrentSpeed = 0.0; // Stop
+            // Use .camera.zoom for MapController in flutter_map v8
             _mapController.move(
               targetLatLng,
-              _mapController.zoom,
+              _mapController.camera.zoom, // Updated
             ); // Center map on arrival
           });
           debugPrint(
@@ -734,8 +725,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       }
 
       // Adjust speed
-      _dummyBikeCurrentSpeed +=
-          (_random.nextDouble() * 2 - 1) *
+      _dummyBikeCurrentSpeed += (_random.nextDouble() * 2 - 1) *
           maxSpeedChange; // Slight random speed changes
       _dummyBikeCurrentSpeed = _dummyBikeCurrentSpeed.clamp(
         0.00002,
@@ -790,8 +780,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       if (!_isPointInPolygon(newLocation, _lalitpurBoundary)) {
         // If outside boundary, try to steer back or clamp
         // For simplicity, let's just reverse heading slightly if hit boundary
-        _dummyBikeHeading +=
-            pi +
+        _dummyBikeHeading += pi +
             (_random.nextDouble() * 0.5 -
                 0.25); // Turn around with some randomness
         _dummyBikeHeading = _dummyBikeHeading % (2 * pi);
@@ -807,7 +796,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         // Only move map if the user is not actively panning/zooming,
         // or if we want to force follow the bike.
         // For now, it always follows. Could add a toggle.
-        _mapController.move(newLocation, _mapController.zoom);
+        // Use .camera.zoom for MapController in flutter_map v8
+        _mapController.move(newLocation, _mapController.camera.zoom); // Updated
       }
     });
   }
@@ -889,7 +879,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       );
       final response = await _apiService.endRide(
         rideId: _activeRideId!,
-        userLocation: finalEndLocation,
+        userLocation: finalEndLocation, // Added missing required argument
+        endLat: finalEndLocation.latitude,
+        endLng: finalEndLocation.longitude,
       );
       if (!mounted) return; // Check mounted after API call
 
@@ -913,7 +905,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         });
         debugPrint("DEBUG: Ride successfully ended via API.");
 
-        showDialog(
+        // FIRST DIALOG: Ride Ended Summary
+        await showDialog(
           context: context,
           builder: (BuildContext context) {
             return AlertDialog(
@@ -933,10 +926,36 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             );
           },
         );
+
+        // SECOND DIALOG: Payment Deduction (displayed AFTER the first one is dismissed)
+        // This block is now correctly placed outside the builder of the first dialog.
+        if (mounted) {
+          String paymentMessage =
+              'Your total fare of Rs. ${finalFare.toStringAsFixed(2)} has been deducted from your account.';
+          if (penaltyAmount > 0) {
+            paymentMessage +=
+                '\n\nAn additional penalty of Rs. ${penaltyAmount.toStringAsFixed(2)} was also deducted.';
+          }
+
+          await showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text('💳 Payment Confirmation'),
+                content: Text(paymentMessage),
+                actions: [
+                  TextButton(
+                    child: const Text('OK'),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              );
+            },
+          );
+        }
       } else {
         // Handle unexpected response or failure
-        final String message =
-            response['error'] ??
+        final String message = response['error'] ??
             response['message'] ??
             'Ride could not be ended. Please try again.';
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1028,7 +1047,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       appBar: AppBar(
         title: const Text("Explore Zupito Rides"),
         backgroundColor: Colors.indigo,
-        
         actions: [
           Consumer<ThemeProvider>(
             builder: (context, themeProvider, _) {
@@ -1037,6 +1055,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
                 ),
                 onPressed: () {
+                  // Corrected: Pass the opposite of the current theme state to toggle it
                   themeProvider.toggleTheme(!themeProvider.isDarkMode);
                 },
               );
@@ -1068,8 +1087,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 FlutterMap(
                   mapController: _mapController,
                   options: MapOptions(
-                    center: _currentLocation!,
-                    zoom: 15,
+                    // Use initialCenter instead of center
+                    initialCenter: _currentLocation!,
+                    // Use initialZoom instead of zoom
+                    initialZoom: 15.0,
                     // Interactive Flags: Only allow necessary interactions if the map feels "stuck"
                     // interactiveFlags: InteractiveFlag.all & ~InteractiveFlag.rotate, // Example: disable rotation
                   ),
@@ -1089,15 +1110,14 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       ), // Optional: show a fallback image on tile load error
                     ),
                     PolylineLayer(
-                      polylineCulling: false,
+                      // polylineCulling: false, // Removed in flutter_map v8
                       polylines: [
                         Polyline(
-                          points:
-                              _lalitpurBoundary +
+                          points: _lalitpurBoundary +
                               [_lalitpurBoundary.first], // Close the polygon
                           strokeWidth: 3,
                           color: Colors.red,
-                          isDotted: true,
+                          // isDotted: true, // Removed in flutter_map v8
                           // borderColor: Colors.deepOrange, // No borderColor property for Polyline
                           // borderStrokeWidth: 1.5,
                         ),
@@ -1153,7 +1173,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                               ],
                             ),
                           ),
-
                         if (_isRideActive && _activeBikeLocation != null)
                           Marker(
                             point: _activeBikeLocation!,

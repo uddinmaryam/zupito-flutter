@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.zupito"
-        minSdk = 21
+        minSdk = 23
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
@@ -44,6 +44,11 @@ flutter {
 }
 
 dependencies {
+    // REQUIRED: These lines are essential for Android themes and UI components
+    implementation("androidx.appcompat:appcompat:1.6.1") // Corrected syntax for Kotlin DSL
+    implementation("com.google.android.material:material:1.12.0") // Corrected syntax for Kotlin DSL
+
+    // Your existing dependencies
     implementation("com.google.android.gms:play-services-auth:20.7.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

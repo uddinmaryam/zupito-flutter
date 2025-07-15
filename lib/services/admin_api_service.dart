@@ -150,7 +150,7 @@ class AdminApiService {
 
 // Approve user
   static Future<void> approveUser(String userId) async {
-    await _post('/approve-user/$userId');
+    await _post('/verify-user/$userId');
   }
 
 // Reject user

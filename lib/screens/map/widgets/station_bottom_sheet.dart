@@ -14,6 +14,8 @@ import 'package:zupito/models/user.dart';
 import 'package:zupito/services/secure_storage_services.dart';
 import 'package:zupito/utils/constants.dart';
 import 'package:zupito/screens/login_screen.dart';
+// Removed payment service import as it's no longer used
+// import 'package:zupito/services/payment_service.dart';
 
 // TOP-LEVEL FUNCTION (called by MapScreen)
 Widget buildStationBottomSheet(
@@ -280,6 +282,7 @@ class _BikeCard extends StatefulWidget {
 
 class _BikeCardState extends State<_BikeCard> {
   bool _loading = false;
+  // Re-introducing a price per minute for "estimated cost" display
   static const double _pricePerMinute = 2.0;
 
   List<Station> _selectableStations = [];
@@ -303,14 +306,17 @@ class _BikeCardState extends State<_BikeCard> {
 
       setState(() {
         _selectableStations = allSelectable;
+        // Default to current station if no other stations are available or selected destination is invalid
         _selectedDestinationStation = widget.station;
       });
 
+      // Ensure the current station is always an option if no other stations are found
       if (_selectableStations.isEmpty && widget.station.id.isNotEmpty) {
         if (!mounted) return;
         setState(() {
           _selectableStations.add(widget.station);
-          _selectedDestinationStation = widget.station;
+          _selectedDestinationStation =
+              widget.station; // Default to current station
         });
       } else if (_selectableStations.isEmpty) {
         if (!mounted) return;
@@ -330,10 +336,12 @@ class _BikeCardState extends State<_BikeCard> {
     }
   }
 
-  Future<void> _showPaymentDialog(Bike bike) async {
+  // Re-introducing a simplified dialog for ride details (duration and destination)
+  Future<void> _showRideDetailsDialog(Bike bike) async {
     final List<int> durations = [1, 2, 5, 30, 45, 60];
-    int selectedDuration = durations[0];
+    int selectedDuration = durations[0]; // Default to first duration
 
+    // Ensure stations are fetched before showing the dialog
     if (_selectableStations.isEmpty || _selectedDestinationStation == null) {
       await _fetchStations();
       if (_selectableStations.isEmpty) {
@@ -345,7 +353,8 @@ class _BikeCardState extends State<_BikeCard> {
         return;
       }
       if (_selectedDestinationStation == null) {
-        _selectedDestinationStation = widget.station;
+        _selectedDestinationStation =
+            widget.station; // Fallback to current station
       }
     }
 
@@ -358,6 +367,7 @@ class _BikeCardState extends State<_BikeCard> {
           builder: (ctx, setState) {
             List<DropdownMenuItem<Station>> destinationDropdownItems = [];
 
+            // Always include the current station as an option
             destinationDropdownItems.add(
               DropdownMenuItem<Station>(
                 value: widget.station,
@@ -365,6 +375,7 @@ class _BikeCardState extends State<_BikeCard> {
               ),
             );
 
+            // Add other selectable stations, excluding the current one if already added
             for (var s in _selectableStations) {
               if (s.id != widget.station.id) {
                 destinationDropdownItems.add(
@@ -372,6 +383,8 @@ class _BikeCardState extends State<_BikeCard> {
                 );
               }
             }
+
+            // Ensure _selectedDestinationStation is a valid option in the dropdown
             if (_selectedDestinationStation == null ||
                 !destinationDropdownItems.any(
                   (item) => item.value?.id == _selectedDestinationStation?.id,
@@ -436,21 +449,28 @@ class _BikeCardState extends State<_BikeCard> {
                   onPressed: () => Navigator.of(ctx).pop(),
                   child: const Text("Cancel"),
                 ),
+                // Dummy Pay Button - now the only confirmation button
                 ElevatedButton(
                   onPressed: () async {
-                    Navigator.of(ctx).pop();
+                    Navigator.of(ctx).pop(); // Close dialog
+                    showTopNotification(context, "✅ Dummy Payment Successful!");
+                    // Simulate a slight delay for payment processing
+                    await Future.delayed(const Duration(milliseconds: 500));
                     await _startRide(
                       bike,
-                      selectedDuration,
+                      selectedDuration, // Pass selected duration
+                      selectedDuration *
+                          _pricePerMinute, // Calculate estimated cost
                       _selectedDestinationStation?.id ?? widget.station.id,
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.indigo,
+                    backgroundColor: Colors.green, // Green for success
                     foregroundColor: Colors.white,
                   ),
-                  child: const Text("Confirm & Pay with eSewa"),
+                  child: const Text("Confirm Payment and Start Ride"),
                 ),
+                // Removed the second "Confirm Ride" button as requested
               ],
             );
           },
@@ -461,7 +481,8 @@ class _BikeCardState extends State<_BikeCard> {
 
   Future<void> _startRide(
     Bike bike,
-    int duration,
+    int duration, // Now dynamically passed from dialog
+    double estimatedCost, // Now dynamically passed from dialog
     String destinationStationId,
   ) async {
     if (!mounted) return;
@@ -487,17 +508,16 @@ class _BikeCardState extends State<_BikeCard> {
         return;
       }
 
-      final double initialEstimatedCost = duration * _pricePerMinute;
       final LatLng confirmedBikeStartLocation = widget.stationStartLocation;
 
       final Map<String, dynamic> responseData =
           await widget.apiService.startRide(
         userId: userId,
         bikeId: bike.id,
-        selectedDuration: duration,
+        selectedDuration: duration, // Use dynamic duration
+        estimatedCost: estimatedCost, // Use dynamic estimated cost
         startStationId: widget.startStationId,
         destinationStationId: destinationStationId,
-        estimatedCost: initialEstimatedCost,
         startLat: confirmedBikeStartLocation.latitude,
         startLng: confirmedBikeStartLocation.longitude,
       );
@@ -507,7 +527,8 @@ class _BikeCardState extends State<_BikeCard> {
 
       final DateTime rideEndTime = responseData['rideEndTime'] != null
           ? DateTime.parse(responseData['rideEndTime'])
-          : DateTime.now().add(Duration(minutes: duration));
+          : DateTime.now()
+              .add(Duration(minutes: duration)); // Use selected duration
 
       if (widget.onRideStartConfirmed != null) {
         await widget.onRideStartConfirmed!(
@@ -519,7 +540,7 @@ class _BikeCardState extends State<_BikeCard> {
       }
 
       if (mounted) {
-        showTopNotification(context, "✅ Payment Successful! Ride started.");
+        showTopNotification(context, "✅ Ride started successfully!");
         Navigator.pop(context);
       }
     } catch (e) {
@@ -602,7 +623,8 @@ class _BikeCardState extends State<_BikeCard> {
         );
 
         if (verify.statusCode == 200) {
-          await _showPaymentDialog(widget.bike);
+          // Call the new ride details dialog after OTP verification
+          await _showRideDetailsDialog(widget.bike);
         } else {
           final err = jsonDecode(verify.body);
           showTopNotification(
@@ -651,7 +673,8 @@ class _BikeCardState extends State<_BikeCard> {
             ? (_loading
                 ? const CircularProgressIndicator()
                 : ElevatedButton(
-                    onPressed: _handleUnlock,
+                    onPressed:
+                        _handleUnlock, // This will now lead to the dialog
                     child: const Text('Unlock'),
                   ))
             : const Icon(Icons.lock, color: Colors.red),
