@@ -404,32 +404,40 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   Future<void> _initLocation() async {
     try {
-      geo.LocationPermission permission =
-          await geo.Geolocator.checkPermission();
-      if (permission == geo.LocationPermission.denied) {
-        permission = await geo.Geolocator.requestPermission();
+      geo.LocationPermission permission = geo.LocationPermission.always;
+
+      // ✅ Skip permission handling on Web to avoid JS crash
+      if (!kIsWeb) {
+        permission = await geo.Geolocator.checkPermission();
+
         if (permission == geo.LocationPermission.denied) {
+          permission = await geo.Geolocator.requestPermission();
+          if (permission == geo.LocationPermission.denied) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Location permissions are denied.')),
+            );
+            throw Exception('Location permissions are denied');
+          }
+        }
+
+        if (permission == geo.LocationPermission.deniedForever) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location permissions are denied.')),
+            SnackBar(
+              content: Text(
+                'Location permissions are permanently denied. Please enable them from your ${kIsWeb ? "browser" : "device"} settings.',
+              ),
+            ),
           );
-          throw Exception('Location permissions are denied');
+          throw Exception('Location permissions are permanently denied');
         }
       }
-      if (permission == geo.LocationPermission.deniedForever) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Location permissions are permanently denied. Please enable them from your ${kIsWeb ? "browser" : "device"} settings.'),
-          ),
-        );
-        throw Exception('Location permissions are permanently denied');
-      }
 
-      // Get the current position
+      // ✅ Now fetch the current position (browser will prompt if needed)
       final pos = await geo.Geolocator.getCurrentPosition(
-          desiredAccuracy: geo.LocationAccuracy.high);
+        desiredAccuracy: geo.LocationAccuracy.high,
+      );
 
       final userLoc = LatLng(pos.latitude, pos.longitude);
 
@@ -438,7 +446,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         _currentLocation = userLoc;
       });
 
-      // Listen for live updates
+      // ✅ Start location updates
       geo.Geolocator.getPositionStream(
         locationSettings: geo.LocationSettings(
           accuracy: geo.LocationAccuracy.high,
