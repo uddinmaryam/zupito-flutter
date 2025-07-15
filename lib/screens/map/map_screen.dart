@@ -20,8 +20,6 @@ import 'package:zupito/screens/paypal_webview.dart';
 import 'package:zupito/services/api_service.dart';
 import 'package:zupito/services/otp_socket_service.dart';
 import 'package:zupito/services/secure_storage_services.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:html' as html;
 
 // import 'package:zupito/services/station_service.dart'; // This import seems unused, can be removed
 import 'package:zupito/utils/constants.dart';
@@ -1288,40 +1286,29 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         mainAxisSize: MainAxisSize.min,
         children: [
           FloatingActionButton.extended(
+            onPressed: _moveToNearestStation,
+            icon: const Icon(Icons.navigation),
+            label: const Text("Nearest Station"),
+            backgroundColor: Colors.indigo,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30),
+            ),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton.extended(
             onPressed: () async {
-              if (kIsWeb) {
-                // 1. Open blank tab IMMEDIATELY to avoid popup blockers!
-                final win = html.window.open('about:blank', '_blank');
+              String? approvalUrl =
+                  await PaymentService.createPayPalOrder(30.0);
 
-                // 2. Get the PayPal approval URL from backend
-                String? approvalUrl =
-                    await PaymentService.createPayPalOrder(30.0);
-
-                print("DEBUG: approvalUrl = $approvalUrl, win = $win");
-                // 3. Log the URL for debugging
-
-                // 4. Redirect or show error
-                if (win != null &&
-                    approvalUrl != null &&
-                    approvalUrl.startsWith('http')) {
-                  win.location.href = approvalUrl;
-                } else {
-                  if (win != null) win.close();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Failed to create PayPal order.")),
-                  );
-                }
-              } else {
-                // MOBILE APP LOGIC
-                String? approvalUrl =
-                    await PaymentService.createPayPalOrder(30.0);
-                if (approvalUrl != null) {
+              if (approvalUrl != null) {
+                if (context.mounted) {
                   final result = await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (ctx) => PayPalWebView(approvalUrl: approvalUrl),
                     ),
                   );
+
                   if (result == 'success') {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text("PayPal Payment Success!")),
@@ -1331,11 +1318,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       SnackBar(content: Text("PayPal Payment Cancelled.")),
                     );
                   }
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Failed to create PayPal order.")),
-                  );
                 }
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Failed to create PayPal order.")),
+                );
               }
             },
             icon: const Icon(Icons.payment),
