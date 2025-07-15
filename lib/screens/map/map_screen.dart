@@ -1297,14 +1297,16 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 String? approvalUrl =
                     await PaymentService.createPayPalOrder(30.0);
 
+                print("DEBUG: approvalUrl = $approvalUrl, win = $win");
                 // 3. Log the URL for debugging
-                print('approvalUrl: $approvalUrl');
 
                 // 4. Redirect or show error
-                if (approvalUrl != null && approvalUrl.startsWith('http')) {
-                  win!.location.href = approvalUrl;
+                if (win != null &&
+                    approvalUrl != null &&
+                    approvalUrl.startsWith('http')) {
+                  win.location.href = approvalUrl;
                 } else {
-                  win!.close();
+                  if (win != null) win.close();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text("Failed to create PayPal order.")),
                   );
