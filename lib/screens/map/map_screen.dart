@@ -1266,8 +1266,47 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               borderRadius: BorderRadius.circular(30),
             ),
           ),
+          const SizedBox(height: 10),
+          FloatingActionButton.extended(
+            onPressed: () async {
+              String? approvalUrl =
+                  await PaymentService.createPayPalOrder(30.0);
+
+              if (approvalUrl != null) {
+                if (context.mounted) {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (ctx) => PayPalWebView(approvalUrl: approvalUrl),
+                    ),
+                  );
+
+                  if (result == 'success') {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("PayPal Payment Success!")),
+                    );
+                  } else if (result == 'cancel') {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("PayPal Payment Cancelled.")),
+                    );
+                  }
+                }
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Failed to create PayPal order.")),
+                );
+              }
+            },
+            icon: const Icon(Icons.payment),
+            label: const Text("Test PayPal"),
+            backgroundColor: Colors.green,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30),
+            ),
+          ),
         ],
       ),
+
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
