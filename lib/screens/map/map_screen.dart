@@ -20,18 +20,13 @@ import 'package:zupito/screens/paypal_webview.dart';
 import 'package:zupito/services/api_service.dart';
 import 'package:zupito/services/otp_socket_service.dart';
 import 'package:zupito/services/secure_storage_services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:html' as html;
 
 // import 'package:zupito/services/station_service.dart'; // This import seems unused, can be removed
 import 'package:zupito/utils/constants.dart';
 import 'widgets/station_bottom_sheet.dart';
 import 'package:zupito/screens/login_screen.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-// Only import this for web! It will break on mobile if not guarded
-import 'dart:html' as html;
-
-void openPaypalApprovalUrl(String approvalUrl) {
-  html.window.open(approvalUrl, '_blank');
-}
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -1116,6 +1111,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               ),
             )
           : Stack(
+              // Only one ':' for the else branch
               children: [
                 FlutterMap(
                   mapController: _mapController,
@@ -1292,27 +1288,20 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         mainAxisSize: MainAxisSize.min,
         children: [
           FloatingActionButton.extended(
-            onPressed: _moveToNearestStation,
-            icon: const Icon(Icons.navigation),
-            label: const Text("Nearest Station"),
-            backgroundColor: Colors.indigo,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
-            ),
-          ),
-          const SizedBox(height: 10),
-          FloatingActionButton.extended(
             onPressed: () async {
               if (kIsWeb) {
-                // 1. Open blank tab IMMEDIATELY
+                // 1. Open blank tab IMMEDIATELY to avoid popup blockers!
                 final win = html.window.open('about:blank', '_blank');
 
-                // 2. Now do your async work (no popups will be blocked now)
+                // 2. Get the PayPal approval URL from backend
                 String? approvalUrl =
                     await PaymentService.createPayPalOrder(30.0);
 
-                // 3. Redirect blank tab to PayPal, or close if failed
-                if (approvalUrl != null) {
+                // 3. Log the URL for debugging
+                print('approvalUrl: $approvalUrl');
+
+                // 4. Redirect or show error
+                if (approvalUrl != null && approvalUrl.startsWith('http')) {
                   win!.location.href = approvalUrl;
                 } else {
                   win!.close();
