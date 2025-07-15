@@ -19,6 +19,8 @@ import 'package:zupito/screens/paypal_webview.dart';
 import 'package:zupito/services/api_service.dart';
 import 'package:zupito/services/otp_socket_service.dart';
 import 'package:zupito/services/secure_storage_services.dart';
+import 'package:location/location.dart';
+
 // import 'package:zupito/services/station_service.dart'; // This import seems unused, can be removed
 import 'package:zupito/utils/constants.dart';
 import 'widgets/station_bottom_sheet.dart';
@@ -77,6 +79,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _initLocation();
     _rippleController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -1002,6 +1005,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     debugPrint(
       "DEBUG: MapScreen disposed. All timers and controllers cancelled.",
     );
+    _mapController.dispose();
+
     super.dispose();
   }
 
@@ -1076,13 +1081,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   CircularProgressIndicator(),
                   SizedBox(height: 16),
                   Text("Fetching your location..."),
-                  Text(
-                    "Please ensure GPS is enabled and permissions are granted.",
-                  ),
                 ],
               ),
             )
           : Stack(
+              // Only one ':' for the else branch
               children: [
                 FlutterMap(
                   mapController: _mapController,
@@ -1128,7 +1131,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                             ),
                           ),
                         ),
-                        if (_currentLocation != null)
+                        if (_currentLocation !=
+                            null) // This check is redundant here, as we are already in the _currentLocation != null branch
                           Marker(
                             point: _currentLocation!,
                             width: 80,
