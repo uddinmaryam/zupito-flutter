@@ -340,7 +340,7 @@ class _BikeCardState extends State<_BikeCard> {
 
   // Re-introducing a simplified dialog for ride details (duration and destination)
   Future<void> _showRideDetailsDialog(Bike bike) async {
-    final List<int> durations = [1, 2, 5, 30, 45, 60];
+    final List<int> durations = [2, 5, 10, 20, 25, 30, 45, 60];
     int selectedDuration = durations[0]; // Default to first duration
 
     // Ensure stations are fetched before showing the dialog

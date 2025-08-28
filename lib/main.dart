@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
-// import 'package:firebase_core/firebase_core.dart'; // Keep if you use Firebase elsewhere, but not for init
-
-// import 'firebase_options.dart'; // Keep if you use DefaultFirebaseOptions for other Firebase services
 import 'package:provider/provider.dart';
 
 // Screens & Services
-import 'package:zupito/services/secure_storage_services.dart';
 import 'package:zupito/screens/splash_screen.dart';
 import 'package:zupito/screens/login_screen.dart';
 import 'package:zupito/screens/map/map_screen.dart';
