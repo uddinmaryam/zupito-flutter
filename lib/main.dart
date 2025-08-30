@@ -23,19 +23,6 @@ import 'providers/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize Stripe (commented out as per previous requests)
-  // Stripe.publishableKey =
-  //   'pk_test_51QvG2EAJNavfvDvkfIMKhBgnpB40NMjoKnOKQKfQarw5tLKG8OgoY3Onf07v5tRHKJoXzJDpOoWwiDldqv84fz2H00YirezZUd';
-  //await Stripe.instance.applySettings();
-
-  // Initialize Firebase - COMMENTED OUT TO AVOID DUPLICATE APP ERROR
-  // Firebase is often automatically initialized by FlutterFire plugins
-  // when using recent versions and `flutterfire configure`.
-  // await Firebase.initializeApp(
-  //   options: DefaultFirebaseOptions.currentPlatform,
-  // );
-
   runApp(
     ChangeNotifierProvider(
       create: (_) => ThemeProvider(),

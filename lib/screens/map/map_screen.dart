@@ -4,8 +4,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart'
-    as geolocator; // Using alias to avoid conflict with Location package
+import 'package:geolocator/geolocator.dart' as geolocator;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
@@ -19,8 +18,6 @@ import 'package:zupito/screens/paypal_webview.dart';
 import 'package:zupito/services/api_service.dart';
 import 'package:zupito/services/otp_socket_service.dart';
 import 'package:zupito/services/secure_storage_services.dart';
-
-// import 'package:zupito/services/station_service.dart'; // This import seems unused, can be removed
 import 'package:zupito/utils/constants.dart';
 import 'widgets/station_bottom_sheet.dart';
 import 'package:zupito/screens/login_screen.dart';
@@ -1197,7 +1194,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   Positioned(
                     bottom: 20,
                     left: 15,
-                    right: 15,
+                    right: 120,
                     child: Card(
                       color: Colors.indigo,
                       shape: RoundedRectangleBorder(

@@ -14,8 +14,8 @@ class BikeCard extends StatelessWidget {
     final double? lng = bike.lng;
     final String assignedStationText =
         (bike.assignedStation != null && bike.assignedStation!.isNotEmpty)
-        ? 'Station ID: ${bike.assignedStation}'
-        : 'Not Assigned';
+            ? 'Station ID: ${bike.assignedStation}'
+            : 'Not Assigned';
 
     final bool isAvailable = bike.isAvailable ?? false;
 
