@@ -1194,60 +1194,76 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   Positioned(
                     bottom: 20,
                     left: 15,
-                    right: 120,
-                    child: Card(
-                      color: Colors.indigo,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      elevation: 6,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Active Ride: ${_activeBikeCode ?? '---'}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                    right: 15,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        // The purple card is purely visual; it won't eat taps.
+                        IgnorePointer(
+                          ignoring: true,
+                          child: Card(
+                            color: Colors.indigo,
+                            elevation: 6,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            child: Padding(
+                              // leave extra bottom padding so the End Ride button can sit "on" the card
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 16, 16, 72),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Active Ride: ${_activeBikeCode ?? '---'}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Time Left: ${_formatDuration(_remainingRideTime)}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Time Left: ${_formatDuration(_remainingRideTime)}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            ElevatedButton.icon(
-                              onPressed: () => _endRide(manualEnd: true),
-                              icon: const Icon(Icons.lock, color: Colors.black),
-                              label: const Text(
-                                "End Ride",
-                                style: TextStyle(
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
-                                  vertical: 10,
-                                ),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
+
+                        // Interactive End Ride button (only clickable element in this area)
+                        Positioned(
+                          bottom: 16,
+                          left: 16,
+                          child: ElevatedButton.icon(
+                            onPressed: () => _endRide(manualEnd: true),
+                            icon: const Icon(Icons.lock, color: Colors.black),
+                            label: const Text(
+                              "End Ride",
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 10,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
               ],
@@ -1266,7 +1282,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               borderRadius: BorderRadius.circular(30),
             ),
           ),
-          const SizedBox(height: 10),
+        ],
+      ),
+      /* const SizedBox(height: 10),
           FloatingActionButton.extended(
             onPressed: () async {
               String? approvalUrl =
@@ -1283,17 +1301,17 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
                   if (result == 'success') {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("PayPal Payment Success!")),
+                      const SnackBar(content: Text("PayPal Payment Success!")),
                     );
                   } else if (result == 'cancel') {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("PayPal Payment Cancelled.")),
+                      const SnackBar(content: Text("PayPal Payment Cancelled.")),
                     );
                   }
                 }
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("Failed to create PayPal order.")),
+                  const SnackBar(content: Text("Failed to create PayPal order.")),
                 );
               }
             },
@@ -1306,7 +1324,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           ),
         ],
       ),
-
+*/
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
